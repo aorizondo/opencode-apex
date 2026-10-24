@@ -303,10 +303,12 @@ npm run check:install                      # installs the package like OpenCode 
 
 `npm publish` runs tests, typecheck and the install check first (`prepublishOnly`).
 
-**Dependency rule.** apex doesn't pin its own `effect`. It uses the copy that
-`@opencode/plugin` brings: `effect` is an optional peer dependency, and `@opencode/plugin` is a
-`^2.1.1` dependency. That keeps apex aligned with each OpenCode release. See
-[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) before changing dependencies.
+**Dependency rule.** OpenCode (≥ 2.1) serves `effect` and `@opencode/plugin` to plugins from
+its own copy, so apex never pins `effect`: it is only an optional peer. The other `@opencode/*`
+packages, such as `@opencode/schema`, do come from apex's own install and must match the host.
+That's why `@opencode/plugin` is a `^2.1.1` dependency, and why apex is reinstalled after
+upgrading OpenCode. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) before changing
+dependencies.
 
 ```
 opencode-apex/

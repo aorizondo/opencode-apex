@@ -39,30 +39,39 @@ which config sources it found.
 | Cause in the log | Fix |
 | --- | --- |
 | `Cannot find package '@opencode/plugin'`, or OpenCode reports a 1.x version | You are on OpenCode V1. Upgrade to V2 (2.1+). |
-| `Schema.isStartsWith is not a function`, `missing TypeId`, or other errors from inside `effect` | Two copies of the `effect` library are mixed (see next section). Force a reinstall. |
+| `Schema.isStartsWith is not a function`, `missing TypeId`, or other errors from inside `effect` | An `@opencode/*` package installed with apex is older than your OpenCode (see next section). Force a reinstall. |
 | `Plugin must export a default definition…` | You pointed `package` at a file. Point it at the plugin **directory** or at the npm name `opencode-apex`. |
 | `Plugin entrypoint not found` | The path in `package` is wrong, or the directory has no `index.ts`. |
 
 ## Version mismatch with OpenCode (`effect`)
 
 apex is written with the [`effect`](https://effect.website) library, and so is OpenCode.
-Every `@opencode/plugin` release pins one exact version of `effect`: 4.0.0-rc.112 up to
-2.0.x, 4.0.1 in 2.1. If apex ran on a *different* copy than `@opencode/plugin`, values
-created by one copy would not be recognized by the other, and loading fails with errors
-from deep inside `effect`.
 
-**How apex avoids it (since 0.2.0):**
+**What OpenCode guarantees.** Since 2.1, OpenCode serves `effect` and `@opencode/plugin` (every
+subpath) to plugins **from its own copy**:
+- an `import "effect"` inside a plugin always gets the host's version;
+- loading those two packages from a plugin's own `node_modules` is refused, with
+  `… is not provided by OpenCode; plugins must use the host's "effect" and "@opencode/plugin" modules`.
 
-1. apex does **not** declare its own `effect` version. `effect` is an **optional peer
-   dependency** (`^4.0.0`), satisfied by the copy `@opencode/plugin` brings, so npm
-   installs **one** copy and it always matches OpenCode.
-2. `@opencode/plugin` and `@opencode/plugin-browser` use caret ranges (`^2.1.1`), so a fresh
-   install follows OpenCode 2.x releases.
-3. On load, apex warns (`[apex] …` in the log) when it finds two copies of `effect`, or
-   when OpenCode is a newer minor version than the `@opencode/plugin` installed with
-   apex.
-4. Before every publish, `scripts/check-install.mjs` installs the package the way
-   OpenCode does and refuses to publish if it finds more than one copy of `effect`.
+**What can still drift.** The *other* `@opencode/*` packages come from apex's own
+`node_modules`: `@opencode/schema` and `@opencode/client`, pulled in by `@opencode/plugin`,
+and `@opencode/plugin-browser`. They run on the host's `effect`, so they must come from the
+same release line as your OpenCode. When they don't, errors come from deep inside `effect`.
+Example: `@opencode/schema` 2.0.14 calls `Schema.isStartsWith`, which no longer exists in the
+`effect` 4.0.1 that OpenCode 2.1 serves.
+
+**How apex keeps them aligned (since 0.2.0):**
+
+1. `@opencode/plugin` and `@opencode/plugin-browser` are `^2.1.1` dependencies. A fresh
+   install pulls the current 2.x packages.
+2. `effect` is only an **optional peer** (`^4.0.0`), for editors and tests outside OpenCode.
+   apex never pins its own version.
+3. On load, apex warns (`[apex] …` in the log) in two cases:
+   - OpenCode is a newer minor version than the `@opencode/plugin` installed with apex,
+     which means its `@opencode/*` packages are older than the host;
+   - it finds two copies of `effect` on disk.
+4. Before every publish, `scripts/check-install.mjs` installs the package the way OpenCode
+   does and refuses to publish if the install is inconsistent or the plugin does not import.
 
 **The one thing you have to do yourself:** OpenCode caches installed plugins and **does
 not refresh them on its own**. After upgrading OpenCode, or to move to a new apex
@@ -209,8 +218,12 @@ To watch the plugin load, run a throwaway server in the foreground:
 
 - **V2 imports only:** `@opencode/plugin` and `@opencode/plugin/effect`, never the V1
   package `@opencode-ai/plugin`.
-- **No own `effect` version** (see the version mismatch section above). Import `effect`
-  freely for control flow, but never declare it as a regular dependency.
+- **No own `effect` version** (see the version mismatch section above). OpenCode serves
+  `effect` and `@opencode/plugin` to plugins. Import them freely, but never declare `effect`
+  as a regular dependency.
+- **Keep `@opencode/plugin` current.** It is the package that pulls the `@opencode/schema`
+  and `@opencode/client` matching the host. Keep its range in step with the OpenCode
+  versions you support.
 - **Tool and RPC schemas are plain JSON Schema**, not `Schema.Struct` from `effect`.
   OpenCode validates them with its own `effect`. A schema object built by another copy
   is not recognized, and the plugin is disabled with

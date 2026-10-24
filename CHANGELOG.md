@@ -3,6 +3,14 @@
 All notable changes to `opencode-apex`. Format based on
 [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Corrected the dependency explanation. OpenCode ≥ 2.1 serves `effect` and
+  `@opencode/plugin` to plugins from its own copy. What has to match the host are the other
+  `@opencode/*` packages installed with apex.
+
 ## [0.2.2] — 2026-10-23
 
 ### Fixed

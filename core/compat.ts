@@ -1,12 +1,13 @@
 /**
  * Compatibilidad con la versión de OpenCode que carga el plugin.
  *
- * apex usa `effect` sin declarar versión propia: la toma de `@opencode/plugin`
- * (peer opcional en package.json), así que npm instala UNA sola copia y la versión
- * sigue sola a la de OpenCode. Si aun así hubiera dos copias (una instalación vieja
- * en caché, un gestor que no hoistea), los efectos de una no se entienden con la otra
- * y el fallo llega críptico (`Schema.isStartsWith is not a function`, "missing TypeId").
- * Aquí se detecta al cargar y se dice qué hacer.
+ * Desde 2.1, OpenCode sirve a los plugins `effect` y `@opencode/plugin` desde SU copia
+ * (packages/plugin/src/runtime.ts): esos dos nunca se desalinean. Lo que sí viene del
+ * node_modules de apex son los demás `@opencode/*` (`@opencode/schema`, `@opencode/client`,
+ * `@opencode/plugin-browser`), que corren sobre el `effect` del host: si son de una versión
+ * anterior, el fallo llega críptico (`Schema.isStartsWith is not a function`).
+ * Aquí se detecta al cargar (OpenCode más nuevo que el `@opencode/plugin` instalado, o dos
+ * copias de `effect` en disco) y se dice qué hacer.
  *
  * La caché npm de plugins de OpenCode no se refresca sola: tras actualizar OpenCode,
  * apex sigue con las dependencias de cuando se instaló hasta que se reinstala.
