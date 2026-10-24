@@ -1,0 +1,274 @@
+{
+  // ==========================================================================
+  // opencode-apex — complete annotated example configuration
+  // (OpenCode V2 only, 2.1 or newer)
+  //
+  // WHERE SETTINGS COME FROM (lowest to highest priority):
+  //   1. GLOBAL file  ~/.config/opencode/opencode-apex.jsonc
+  //   2. inline plugin options in opencode.json  { "plugins": [{ "package": "opencode-apex", "options": {…} }] }
+  //   3. LOCAL file   <project>/.opencode/opencode-apex.jsonc   ← like this one
+  //   Rule: scope wins (local over global) and, within a scope, the file wins
+  //   over the inline options  ⇒  inline options override the global file but
+  //   are overridden by the local file. Objects merge; arrays are REPLACED.
+  //
+  // COMMENTS: #, // and /* */ are accepted (a # inside a string is kept).
+  // Strings cannot span lines: write line breaks as \n. Regex backslashes are
+  // doubled: \\b.
+  //
+  // TEMPLATES (events.subscriptions[].promptTemplateFile, advisor.promptTemplateFile):
+  //   relative paths only — to the project ("prompts/x.md") or to home ("~/x.md").
+  //   Absolute paths and ../ escapes are rejected; a missing file is CREATED
+  //   with the default template.
+  //
+  // Every field is optional: with no source at all the plugin starts with the
+  // defaults. Environment variables in this file: ${VAR}, ${VAR:-default} or
+  // $VAR. (A ${VAR} that is not set invalidates the config → all defaults; use
+  // ${VAR:-} for an empty fallback.) {env:VAR} is OpenCode syntax and only
+  // works inside opencode.json.
+  // ==========================================================================
+
+  // --------------------------------------------------------------------------
+  // Modules: turn each one on or off.
+  // SINGLE SWITCH: it lives ONLY here — there is no <module>.enabled.
+  // An omitted key means the module's default: all ON except guard (OFF).
+  // --------------------------------------------------------------------------
+  "modules": {
+    "redact": true,
+    "events": false,
+    "advisor": true,
+    "guard": false,
+    "browser": true
+  },
+
+
+  // --------------------------------------------------------------------------
+  // redact — keep secrets away from the model by encrypting them (AES-256-GCM).
+  //
+  // Each match is encrypted and replaced by a readable marker:
+  //     ${prefix}${patternName}:${base64url(iv||tag||ciphertext)}${suffix}
+  //     e.g. [SECRET:github-pat:AbC123...]
+  // Restoring decrypts the marker itself (there is no in-memory mapping).
+  // Redaction applies only to what is sent to the model ("context" hook);
+  // restoration only to tool arguments ("execute.before" hook). Model answers
+  // are not restored: you see the readable marker.
+  //
+  // patterns:  your own regexes (added on top of the bundles); each is named
+  //            custom-<index> and is always active
+  // bundles:   named groups of detectors. Setting this REPLACES the default
+  //            list. Default (38): aws, github, gitlab, slack, jwt, pem,
+  //            bearer, env, openai, anthropic, google, stripe, npm, database,
+  //            azure, terraform, vault, heroku, vercel, supabase, digitalocean,
+  //            cloudflare, observability, pypi, rubygems, twilio, sendgrid,
+  //            postman, mailgun, mailchimp, linear, shopify, square, docker,
+  //            kubernetes, cohere, huggingface, discord.
+  //            Opt-in (noisy / personal data, NOT on by default): pii, network, datadog.
+  // minConfidence: low | medium | high — drops noisy detectors (default medium)
+  // allowlist: regexes tested against each matched secret; matches stay in clear
+  // key:       key material -> literal | env:VAR | file:/absolute/path | hex:... | base64:...
+  //            (file: does not expand ~). Empty → the APEX_REDACT_KEY variable.
+  //            If nothing resolves, the key saved in ~/.config/opencode/apex.key
+  //            is reused, or a random one is generated there (0600).
+  //            Changing the key orphans markers made with the old one.
+  // mode:      "strict" (replaces) | "warn" (only logs)
+  // restore:   which outputs are decrypted (only tool input for now)
+  // --------------------------------------------------------------------------
+  "redact": {
+    "mode": "strict",
+    "patterns": ["\\bcustom-secret-[A-Za-z0-9]{16}\\b","private-password"],
+    "bundles": ["aws", "github", "gitlab", "slack", "jwt", "pem", "bearer", "env", "openai", "anthropic", "google", "stripe", "npm", "database", "azure", "terraform", "vault", "heroku", "vercel", "supabase", "digitalocean", "cloudflare", "observability", "pypi", "rubygems", "twilio", "sendgrid", "postman", "mailgun", "mailchimp", "linear", "shopify", "square", "docker", "kubernetes", "cohere", "huggingface", "discord"],
+    "minConfidence": "medium",
+    "allowlist": ["^sk-test-"],
+    "prefix": "[SECRET:",
+    "suffix": "]",
+    "key": "env:APEX_REDACT_KEY",
+    "restore": { "toolInput": true }
+  },
+
+  // --------------------------------------------------------------------------
+  // events — wake an agent from outside the conversation: callbacks, webhooks,
+  // scheduled checks. An external process calls the OpenCode server's RPC
+  // endpoint; matching subscriptions deliver the event to a session.
+  // routing: "all" (fan-out to every matching subscription) | "first" (only the
+  //          highest priority one)
+  // Each subscription filters events and delivers them to a session. The text
+  // comes from promptTemplate (inline) or promptTemplateFile (wins).
+  // Placeholders: {{payload.field}}, {{source}}, {{type}}, {{eventID}}.
+  // agent:     switch the target session to this agent before delivering (optional).
+  // deliverAs: "prompt" (a user prompt: starts a turn; default) | "synthetic".
+  // resume:    ONLY with deliverAs="synthetic". true → wakes the agent loop and
+  //            the model processes the message; false → passive, it waits for
+  //            the next turn (default false).
+  // sessionID:
+  //   - "" / null / missing → AUTO-BINDING to the active main session of THIS
+  //     project: the root session you work in. Never the advisor, the
+  //     tools.run runner, or subagent sessions (parentID).
+  //     When that session is deleted the subscription is UNBOUND; the next
+  //     main session binds it again.
+  //   - "ses_xxx"            → that session (if it does not exist, delivery fails and is logged).
+  // The examples below have "enabled": false.
+  // operator: equals | contains | matches | gt | lt | in | notIn | exists | notExists
+  // delivery: "queue" (waits its turn) | "steer" (injected into the running turn)
+  // --------------------------------------------------------------------------
+  "events": {
+    "routing": "all",
+    // Everything enters through the server's RPC (POST /api/rpc/apex/<method>,
+    // HTTP Basic auth). There is no listener of its own: OpenCode unloads plugins
+    // after 60 min without activity, and an RPC call loads the project again.
+    // Webhooks → a relay (n8n, a small daemon) that turns the HTTP call into
+    // events.ingest (see the apex-callbacks skill and docs/EVENTS.md).
+    "server": {
+      // Base URL of the server for local scripts. Empty = discover it (the
+      // background service record, or --port of `opencode serve`). Set it when
+      // the server sits behind a proxy.
+      "url": "",
+      // Public URL (tunnel/proxy) for senders on other machines. The agent can
+      // set it at runtime with apex_set_callback_url (precedence: runtime > config).
+      "publicUrl": ""
+    },
+    // RPC apex/tools.run: an external process runs one OpenCode tool (built-in,
+    // from a plugin, or MCP) without a model. deny wins over allow; then the
+    // permissions of `agent` (or the agent passed in the call) decide. With
+    // nobody watching, an "ask" waits for the advisor or until timeoutMs.
+    "tools": {
+      "enabled": true,
+      "allow": ["*"],
+      "deny": ["question", "subagent", "execute", "apex_*"],
+      "agent": "build",
+      "timeoutMs": 120000
+    },
+    "subscriptions": [
+      {
+        "sessionID": "",
+        "agent": "plan",
+        "filters": [
+          { "field": "type", "operator": "equals", "value": "ci.failed" },
+          // `in` compares exact values; for prefixes or wildcards use `matches` with a regex.
+          { "field": "payload.branch", "operator": "matches", "pattern": "^(main|release/.+)$" }
+        ],
+        "promptTemplate": "CI failed on {{payload.branch}} ({{payload.commit}}). Investigate and propose a fix.",
+        "promptTemplateFile": "prompts/ci-failure.md",
+        "deliverAs": "prompt",
+        "delivery": "queue",
+        "priority": 10,
+        "enabled": false
+      },
+      {
+        "sessionID": "",
+        "filters": [{ "field": "type", "operator": "matches", "pattern": "^deploy\\." }],
+        "promptTemplate": "Deploy detected: {{payload.env}}",
+        "deliverAs": "synthetic",
+        "resume": true,
+        "delivery": "steer",
+        "priority": 5,
+        "enabled": false
+      }
+    ]
+  },
+
+
+
+  // --------------------------------------------------------------------------
+  // browser — serves the browser.* tools against an EXTERNAL Chromium over CDP
+  // (Chrome DevTools Protocol).
+  //
+  // OpenCode's browser plugin already registers those tools, but they only work
+  // when something attaches a browser. On a server without the desktop app
+  // nothing does, and every call fails with "browser is disconnected". This
+  // module attaches a real browser and serves them.
+  //
+  // mode:
+  //   "auto"      (default) and "external": attach only when asked to — by the
+  //               agent (tool browser.target) or by you (/browser-target), never
+  //               on every tool call. No surprises.
+  //   "in-app"    never attaches, and releases any attachment so the desktop
+  //               app can serve the session.
+  //
+  // MIND THE CONFLICT: the protocol allows ONE attachment per session (each
+  // attach replaces the previous one). The plugin and the Electron desktop app
+  // never serve the same session at once; the loser sees "browser.disconnected".
+  // Switch at runtime with the browser.target tool or /browser-target.
+  //
+  // cdpUrl:  "auto" (reads DevToolsActivePort from known profiles)
+  //          | "port" | "ws://host:port/path" | "wss://…" for a remote browser
+  // profile: explicit profile directory. "" = detect. Pointing this at
+  //          ai.opencode.desktop requires the Electron app to be CLOSED: two
+  //          processes on the same user-data-dir corrupt the cookie SQLite.
+  // headers/caFile/insecureSkipVerify: for a remote wss:// behind a reverse
+  //          proxy. Chrome's native CDP speaks neither TLS nor headers, so a
+  //          browser on another machine needs a tunnel in front (ssh -L,
+  //          tailscale, cloudflared, nginx).
+  //
+  // THIS IS THE DEFAULT, NOT THE ONLY OPTION. browser.target and /browser-target
+  // accept a target and override the config at runtime:
+  //   browser.target({ mode: "external", cdpUrl: "9333" })
+  //   browser.target({ mode: "external", profile: "~/.config/google-chrome" })
+  //   /browser-target external 9333
+  //   /browser-target external wss://tunnel.example/devtools
+  // A target starting with / or ~ is a profile; anything else is a URL or port.
+  // Omitting it keeps the current one. Changing it closes the socket and drops
+  // the attachments; the session that changed it re-attaches in the same call
+  // and the others ask again with browser.target or /browser-target.
+  //
+  // CHROME MODES THAT MATTER:
+  //   --remote-debugging-port  → /json/version answers 200. IGNORED on the
+  //     default user-data-dir since Chrome 136, so it needs its own profile.
+  //     No popup.
+  //   chrome://inspect/#remote-debugging (toggle) → /json/version answers 404
+  //     BY DESIGN and the URL comes from DevToolsActivePort. It shows an
+  //     "Allow remote debugging?" popup FOR EACH CONNECTION. The socket stays
+  //     open, but reloading the plugin asks again.
+  //
+  // Several profiles can declare the same port (the files go stale when Chrome
+  // closes), so they are tried in order and the first that really answers
+  // wins. That is why connecting can take a while.
+  // --------------------------------------------------------------------------
+  "browser": {
+    "mode": "auto",
+    "cdpUrl": "auto",
+    "profile": "",
+    "connectTimeoutMs": 90000,
+    "reconnectSeconds": 15,
+    "headers": {},
+    "caFile": "",
+    "insecureSkipVerify": false
+  },
+
+
+  // --------------------------------------------------------------------------
+  // advisor — permission decisions made by a dedicated advisor session.
+  //
+  // The plugin defines (upserts) the hidden agent "apex-advisor" with its own
+  // model and permissions: it can ONLY use the apex_advisor_decide tool.
+  // There is ONE advisor session per session TREE: your root session and all
+  // its subagents share it, and it is kept whole → a full audit trail of every
+  // allow/deny.
+  //
+  // Vocabulary: approve = "allow"; deny = "deny" + reason.
+  // model:      the advisor's model (fast/cheap; it runs with full context)
+  // decisive:   true = its decision is applied to the permission · false = advisory only
+  //             (default false)
+  // evaluate:   "ask-only" (default) only when your rules did not decide ·
+  //             "all" consults it on EVERY tool call
+  // timeoutMs:  no decision in time → the permission is left as it was (never blocks)
+  //             (default 10000)
+  // location:   directory of the advisor session. Default: a dedicated one
+  //             OUTSIDE the project (<tmp>/opencode-apex-advisor). Instruction
+  //             discovery is per location, so the repo's AGENTS.md is not
+  //             injected. (The global AGENTS.md in ~/.config/opencode always applies.)
+  // actions:    filter by tool name (empty = all)
+  // system:     system prompt of the advisor agent (optional)
+  // promptTemplate: template of each request ({{requestID}}, {{action}}, {{resources}},
+  //             {{sessionID}}, {{agent}}, {{enforcement}}, {{metadata.<field>}}). A single-line JSON
+  //             string: write line breaks as \n.
+  // --------------------------------------------------------------------------
+  "advisor": {
+    "model": "opencode/big-pickle",
+    "decisive": true,
+    "evaluate": "ask-only",
+    "timeoutMs": 10000,
+    "location": "",
+    "actions": [],
+    "promptTemplate": "Request {{requestID}}\nTool: {{action}}\nResources: {{resources}}\nSession: {{sessionID}} ({{agent}})\n{{enforcement}}\nDecide with apex_advisor_decide."
+  }
+
+}

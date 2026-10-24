@@ -1,0 +1,75 @@
+{
+  "name": "opencode-apex",
+  "version": "0.2.1",
+  "description": "Modular plugin for OpenCode V2 (>= 2.1): secret redaction, RPC callbacks/webhooks/watchers that wake agents, tools.run, AI permission advisor, guard meta-permissions, external browser over CDP",
+  "license": "MIT",
+  "author": "Antonio Orizondo Leyva",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aorizondo/opencode-apex.git"
+  },
+  "homepage": "https://github.com/aorizondo/opencode-apex#readme",
+  "bugs": {
+    "url": "https://github.com/aorizondo/opencode-apex/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "opencode-v2",
+    "plugin",
+    "redaction",
+    "secrets",
+    "webhooks",
+    "callbacks",
+    "rpc",
+    "automation",
+    "permissions",
+    "cdp",
+    "browser"
+  ],
+  "engines": {
+    "opencode": ">=2.1.0"
+  },
+  "type": "module",
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "redact.ts",
+    "events.ts",
+    "advisor.ts",
+    "guard.ts",
+    "browser.ts",
+    "browser",
+    "core",
+    "docs",
+    "opencode-apex.jsonc",
+    "skills",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@opencode/plugin": "^2.1.1",
+    "@opencode/plugin-browser": "^2.1.1",
+    "jsonc-parser": "^3.3.1",
+    "ws": "^8.22.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "bun-types": "^1.1.0"
+  },
+  "scripts": {
+    "test": "bun test/events.test.ts && bun test/guard.test.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "check:install": "node scripts/check-install.mjs",
+    "prepublishOnly": "npm test && npm run typecheck && npm run check:install"
+  },
+  "peerDependencies": {
+    "effect": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "effect": {
+      "optional": true
+    }
+  }
+}
