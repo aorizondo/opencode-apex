@@ -3,7 +3,7 @@
 All notable changes to `opencode-apex`. Format based on
 [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.2.2] — 2026-10-23
 
 ### Fixed
 
