@@ -5,7 +5,21 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-10-25
+
 ### Changed
+
+- The `apex-callbacks` skill now teaches relays in general, not only watchers and webhooks.
+  It covers:
+  - any source: messaging, email, SSE/WebSocket streams, queues, webhooks;
+  - any language and OS;
+  - what relay code can do with OpenCode and MCP tools through `tools.run`, and its limits;
+  - reachability: a relay behind NAT can't receive Internet webhooks without an outbound
+    mode, a tunnel (Cloudflare, Tailscale, ngrok), reverse SSH or store-and-forward.
+
+  `SKILL.md` stays short. The detail moved to `references/` (relays, reachability,
+  run-anywhere, examples), with a Python SSE relay, PowerShell ingest and GitHub signature
+  checks in the Node webhook relay. It also documents the subscription filter operators.
 
 - Corrected the dependency explanation. OpenCode ≥ 2.1 serves `effect` and
   `@opencode/plugin` to plugins from its own copy. What has to match the host are the other

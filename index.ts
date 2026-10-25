@@ -26,7 +26,7 @@ import { registerSkills } from "./core/skills.js"
 import { compatibilityWarnings } from "./core/compat.js"
 
 // Plugin version
-const VERSION = "0.2.2"
+const VERSION = "0.2.3"
 
 interface ModuleConfigs {
   redact: RedactConfig & { enabled: boolean }
