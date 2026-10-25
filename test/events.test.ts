@@ -6,7 +6,7 @@
  * silencio (`rpc.unavailable`, `delivered: []`).
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -131,6 +131,10 @@ console.log("\nSkills del paquete")
   check("habla de tools.run y del endpoint", !!callbacks && callbacks.content.includes("tools.run") &&
     callbacks.content.includes("apex_callback_endpoint"))
   check("sin listener HTTP", !!callbacks && !callbacks.content.includes("4599"))
+  // El agente abre las referencias por ruta relativa a SKILL.md: si una falta, la guía queda rota.
+  const referenced = [...new Set((callbacks?.content ?? "").match(/references\/[\w-]+\.md/g) ?? [])]
+  const base = callbacks ? callbacks.path.replace(/SKILL\.md$/, "") : ""
+  check("referencias de la skill existen", referenced.length >= 4 && referenced.every((file) => existsSync(base + file)))
 }
 
 console.log("\nConfig")

@@ -245,8 +245,10 @@ OpenCode can reach (an MCP server such as Easypanel, the browser tools…).
 A webhook is a callback with an **intermediate process**: the external service calls a
 relay over HTTP (n8n, a small daemon), and the relay turns that call into `events.ingest`.
 OpenCode itself does not expose a webhook URL. The `apex-callbacks` skill includes a
-minimal Node relay and an n8n recipe. To receive webhooks from the Internet, expose the
-relay (with its own token), never the OpenCode server.
+minimal Node relay (token and GitHub signature checks) and an n8n recipe. To receive webhooks
+from the Internet, expose the relay (with its own token), never the OpenCode server. A relay
+behind NAT needs the provider's outbound mode, a tunnel, a reverse connection or a public
+receiver that stores events for it: the skill's `references/reachability.md` compares them.
 
 ## Tools
 
@@ -258,5 +260,7 @@ relay (with its own token), never the OpenCode server.
 - `apex_set_callback_url` — sets/clears the server's public URL (tunnel/proxy); `null` clears it.
 
 The **`apex-callbacks`** skill ships with the package (`skills/apex-callbacks/SKILL.md`) and
-registers itself wherever apex loads: stateful watchers, systemd/cron, webhooks and
-`tools.run`.
+registers itself wherever apex loads. `SKILL.md` holds the model and the steps. Its
+`references/` cover relay design for any source (`relays.md`), reachability and tunnels
+(`reachability.md`), running on Linux, macOS, Windows or containers (`run-anywhere.md`) and
+copyable code (`examples.md`).
