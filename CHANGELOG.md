@@ -5,6 +5,32 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-11-02
+
+### Added
+
+- **The advisor now knows whose process a `kill` targets.** Before asking about a `shell`
+  permission that contains `kill`, `pkill`, `killall` or `kill $(pgrep …)`, apex reads
+  `/proc` and adds a `{{processes}}` block to the request. For each target it gives the
+  owner, the command, who launched it, and whether it is critical. Critical means the
+  OpenCode server itself, one of its parents, or PID 1. Who launched it comes from
+  `OPENCODE_SESSION_ID`, which OpenCode's `shell` tool exports to every command. The
+  possible values are this conversation (any session in the same tree), another
+  OpenCode conversation, the user, another user, or unknown. `kill -1`, `kill 0`,
+  process groups and patterns that match nothing get an explicit note.
+
+  Before this change the advisor only saw `kill 705875`. With a rule like "deny killing
+  processes that are not ours", it denied every plain `kill <PID>`, including processes
+  the agent had just started.
+- `advisor.processContext` (default `true`) turns it off. It only works on Linux; on other
+  systems, or when `/proc` cannot be read, the request is unchanged.
+
+### Changed
+
+- The advisor's cache key includes the process block. An answer for `kill 1234` is not
+  reused once PID 1234 belongs to a different process.
+- A custom `promptTemplate` without `{{processes}}` gets the block appended at the end.
+
 ## [0.2.3] — 2026-10-25
 
 ### Changed

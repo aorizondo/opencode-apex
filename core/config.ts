@@ -197,6 +197,8 @@ const advisorConfigSchema = z.object({
   evaluate: z.enum(["ask-only", "all"]).default("ask-only"),
   timeoutMs: z.number().int().positive().default(10000),
   location: z.string().optional(),
+  // Lee /proc antes de juzgar un kill: de quién es cada PID. Ver core/process-context.ts.
+  processContext: z.boolean().default(true),
 })
 
 const guardRuleSchema = z.object({
@@ -237,7 +239,7 @@ const browserConfigSchema = z.object({
 export const apexConfigSchema = z.object({
   redact: redactConfigSchema.default(() => ({ mode: "strict" as const, patterns: [], bundles: [...DEFAULT_BUNDLES], minConfidence: "medium" as const, allowlist: [], prefix: "[SECRET:", suffix: "]", key: "", restore: { toolInput: true } })),
   events: eventsConfigSchema.default(() => ({ routing: "all" as const, subscriptions: [], server: {}, tools: defaultEventsTools() })),
-  advisor: advisorConfigSchema.default(() => ({ actions: [], decisive: false, evaluate: "ask-only" as const, timeoutMs: 10000 })),
+  advisor: advisorConfigSchema.default(() => ({ actions: [], decisive: false, evaluate: "ask-only" as const, timeoutMs: 10000, processContext: true })),
   guard: guardConfigSchema.default(() => ({
     mode: "report" as const,
     fallback: "keep" as const,

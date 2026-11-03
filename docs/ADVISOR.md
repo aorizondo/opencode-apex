@@ -101,6 +101,7 @@ The advisor module is **on by default** (`modules.advisor`). Set `"advisor": fal
   "timeoutMs": 10000,               // wait this long for an answer, then leave the permission as it was
   "actions": [],                    // tool names to judge; empty = all
   "location": "",                   // advisor session directory; empty = <tmp>/opencode-apex-advisor
+  "processContext": true,           // describe the processes a kill/pkill/killall would hit (Linux)
   "system": "…",                    // optional: replaces the advisor's system prompt
   "promptTemplate": "…",            // optional: the request text sent to the advisor
   "promptTemplateFile": "…"         // optional: same, from a file (wins over promptTemplate)
@@ -109,9 +110,59 @@ The advisor module is **on by default** (`modules.advisor`). Set `"advisor": fal
 
 - **Template placeholders:** `{{requestID}}`, `{{action}}`, `{{resources}}`, `{{sessionID}}`,
   `{{agent}}`, `{{enforcement}}` (a sentence that tells the advisor whether its decision is
-  applied) and `{{metadata.<path>}}`.
+  applied), `{{processes}}` (see [below](#killing-processes-whose-process-is-it)) and
+  `{{metadata.<path>}}`.
 - **`promptTemplateFile`** must be a relative path, inside the project or your home
   directory. If the file does not exist, it is created with the default template.
+
+## Killing processes: whose process is it?
+
+A permission for `kill 705875` tells the advisor nothing about process 705875. It could
+be the dev server the agent started a minute ago, or your browser. An advisor told to
+deny "killing processes that are not ours" can only guess, and a careful one denies. (Measured
+before 0.2.4: every plain `kill <PID>` was denied, while `pkill -f "n8n start"` — where
+the name is visible — was allowed.)
+
+With `processContext: true` (the default), apex reads `/proc` before asking. For every
+`kill`, `pkill`, `killall` and `kill $(pgrep …)` in a `shell` permission it adds a block like
+this to the request:
+
+```
+Procesos afectados (leído de /proc por apex, no lo afirma el agente):
+- PID 751365 · antonio · lanzado por un agente de ESTA conversación (o uno de sus subagentes)
+    sleep 60
+- PID 2914 · antonio · del usuario, no lanzado por opencode
+    /usr/bin/kwin_wayland_wrapper --xwayland
+```
+
+For each process it reports:
+
+| Field | How apex knows |
+| --- | --- |
+| owner | `Uid` in `/proc/<pid>/status` |
+| command | `/proc/<pid>/cmdline` |
+| who launched it | OpenCode's `shell` tool exports `OPENCODE_SESSION_ID` to every command it runs. apex reads it from `/proc/<pid>/environ` (or from a parent's, for processes started with `nohup`/`setsid`) and checks whether that session belongs to the same session tree as the one asking |
+| critical | the OpenCode server itself, any of its parents (the terminal holding it) or PID 1 |
+
+The labels are: **this conversation** (launched by the asking session, its root or any
+subagent of that tree), **another OpenCode conversation**, **the user's** (same user, not
+launched by OpenCode), **another user's** (root or a different account) and **unknown**
+(environment not readable). `kill -1`, `kill 0` and process groups get an explicit
+warning; a `pkill` pattern that matches nothing says so.
+
+apex only **describes**; the advisor still decides. Give it a rule that uses the block,
+for example: *"Allow killing processes launched by this conversation. Deny killing
+processes marked CRÍTICO, other users' processes and `kill -1`. For the user's own
+processes, allow only if the command is clearly what the agent is working on."*
+
+Notes:
+
+- The block is part of the cache key, so an answer for `kill 1234` is not reused once
+  PID 1234 belongs to a different process.
+- Your own `promptTemplate` does not need `{{processes}}`: if it is missing, the block is
+  appended at the end.
+- Linux only. On other systems, or if `/proc` cannot be read, nothing is added and the
+  request is the same as before.
 
 ## Keeping the project's AGENTS.md away from the advisor
 
@@ -138,8 +189,9 @@ in the session's `metadata.apexAdvisorLocation`.
   the link in `metadata.apexAdvisorFor`.
 - **Each uncached decision costs one model round trip.** With `evaluate: "all"`, every tool
   call waits for it.
-- **The cache key is only `(action, resources)`.** An answer given for one agent is reused
-  for any other agent asking the same thing within 10 minutes.
+- **The cache key is only `(action, resources)`**, plus the process block for kills. An
+  answer given for one agent is reused for any other agent asking the same thing within
+  10 minutes.
 - **A missing answer never blocks you:** after `timeoutMs` the normal prompt appears.
 
 ## Working with the guard

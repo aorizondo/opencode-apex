@@ -24,6 +24,7 @@ import { ADVISOR_AGENT_ID, ensureAdvisorAgent } from "./core/advisor-agent.js"
 import { readOrCreateTemplate } from "./core/templates.js"
 import { registerAdvisorTool } from "./core/advisor-tool.js"
 import {
+  buildProcessContext,
   DEFAULT_ADVISOR_REQUEST_TEMPLATE,
   isAdvisorSession,
   requestAdvisorDecision,
@@ -63,6 +64,13 @@ export interface AdvisorConfig {
    * ancestros del home; el AGENTS.md global de ~/.config/opencode sigue aplicando.
    */
   location?: string
+  /**
+   * Antes de consultar un `kill`/`pkill`/`killall`, lee `/proc` y le dice al advisor
+   * de quién es cada proceso: dueño, comando, si lo lanzó un agente de esta
+   * conversación y si es crítico (el propio opencode). Por defecto `true`. Sin
+   * esto el advisor ve `kill 1234` y nada más. Solo Linux; en otro sistema no añade nada.
+   */
+  processContext?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -102,9 +110,14 @@ interface PermissionEvaluationEvent {
   message?: string
 }
 
-function generateCacheKey(action: string, resources: readonly string[]): string {
+/**
+ * `context` entra en la clave porque cambia la respuesta correcta: `kill 1234`
+ * aprobado cuando 1234 era el servidor de pruebas del agente no vale cuando ese
+ * PID se ha reciclado y ahora es el navegador del usuario.
+ */
+function generateCacheKey(action: string, resources: readonly string[], context = ""): string {
   const sorted = [...resources].sort()
-  const input = action + JSON.stringify(sorted)
+  const input = action + JSON.stringify(sorted) + context
   return createHash("sha256").update(input).digest("hex").slice(0, 32)
 }
 
@@ -168,6 +181,7 @@ export function register(
     const template = templateFile.content ?? config.promptTemplate ?? DEFAULT_ADVISOR_REQUEST_TEMPLATE
     const evaluateAll = config.evaluate === "all"
     const actionFilter = new Set(config.actions ?? [])
+    const processContext = config.processContext ?? true
 
     // 1. Agente advisor dedicado (upsert)
     yield* ensureAdvisorAgent(ctx, { model: config.model, system: config.system, decisive })
@@ -192,7 +206,13 @@ export function register(
         if (!evaluateAll && e.effect !== "ask") return
 
         const startedAt = Date.now()
-        const cacheKey = generateCacheKey(e.action, e.resources)
+        // Se calcula ANTES de la caché: forma parte de la clave.
+        const processes = processContext
+          ? await buildProcessContext(ctx, { sessionID: e.sessionID, action: e.action, resources: e.resources }).catch(
+              () => null,
+            )
+          : null
+        const cacheKey = generateCacheKey(e.action, e.resources, processes?.text)
 
         // Camino rápido: veredicto cacheado
         const cached = cache.get(cacheKey)
@@ -219,6 +239,7 @@ export function register(
           timeoutMs,
           template,
           location: config.location,
+          processes: processes?.text,
         })
 
         if (!decision) {
@@ -286,5 +307,6 @@ export function createDefaultAdvisorConfig(): AdvisorConfig {
     timeoutMs: DEFAULT_TIMEOUT_MS,
     actions: [],
     promptTemplate: DEFAULT_ADVISOR_REQUEST_TEMPLATE,
+    processContext: true,
   }
 }

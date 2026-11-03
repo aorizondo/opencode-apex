@@ -20,6 +20,13 @@ import { randomUUID } from "node:crypto"
 import { Effect } from "effect"
 import type { Plugin } from "@opencode/plugin/effect"
 import { ADVISOR_AGENT_ID } from "./advisor-agent.js"
+import {
+  currentUid,
+  formatProcessContext,
+  launchers,
+  processTargetsFor,
+  type TargetDescription,
+} from "./process-context.js"
 
 export interface AdvisorDecision {
   readonly decision: "allow" | "deny"
@@ -39,6 +46,11 @@ export interface AdvisorRequest {
   readonly template: string
   /** Directorio de la sesión advisor (aislado del proyecto por defecto). */
   readonly location?: string
+  /**
+   * Bloque `{{processes}}` ya calculado (ver `buildProcessContext`). Vacío o
+   * ausente si el comando no mata ningún proceso.
+   */
+  readonly processes?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +221,10 @@ export async function getOrCreateAdvisorSession(
 
 /** Renderiza la petición para el advisor (placeholders de la plantilla). */
 export function renderAdvisorRequest(template: string, input: AdvisorRequest, requestID: string): string {
+  // Una plantilla propia escrita antes de 0.2.4 no trae `{{processes}}`, y sin
+  // ese bloque el advisor vuelve a juzgar un `kill <PID>` a ciegas. Se añade al
+  // final en vez de exigir que cada usuario edite su plantilla.
+  if (input.processes && !template.includes("{{processes}}")) template = `${template}\n\n{{processes}}`
   const enforcement = input.decisive
     ? "Tu decisión se APLICA automáticamente."
     : "Tu decisión se muestra al usuario, que decide."
@@ -220,6 +236,7 @@ export function renderAdvisorRequest(template: string, input: AdvisorRequest, re
     .replace(/\{\{sessionID\}\}/g, input.sessionID)
     .replace(/\{\{agent\}\}/g, input.agent ?? "default")
     .replace(/\{\{enforcement\}\}/g, enforcement)
+    .replace(/\{\{processes\}\}/g, input.processes ?? "")
     .replace(/\{\{metadata\.([^}]+)\}\}/g, (_m, path: string) => {
       const value = path
         .split(".")
@@ -234,9 +251,34 @@ export const DEFAULT_ADVISOR_REQUEST_TEMPLATE = `Solicitud de permiso {{requestI
 Herramienta: {{action}}
 Recursos: {{resources}}
 Sesión solicitante: {{sessionID}} · Agente: {{agent}}
+{{processes}}
 {{enforcement}}
 
 Decidí con \`apex_advisor_decide\` (requestID={{requestID}}). Si denegás, incluí un motivo.`
+
+/**
+ * Bloque de procesos para un permiso de `shell` que mata algo, o "" si no mata nada.
+ *
+ * «De esta conversación» significa del mismo ÁRBOL que la sesión solicitante: un
+ * proceso arrancado por el agente principal y matado por un subagente (o al revés)
+ * es trabajo propio. Para saberlo, cada sesión que aparece como lanzadora en /proc
+ * se sube hasta su raíz y se compara con la raíz de quien pide el permiso. Solo se
+ * resuelven las sesiones que aparecen — normalmente una o ninguna.
+ */
+export async function buildProcessContext(
+  ctx: Plugin.Context,
+  input: { sessionID: string; action: string; resources: readonly string[] },
+): Promise<{ text: string; targets: TargetDescription[] } | null> {
+  const targets = processTargetsFor(input.action, input.resources)
+  if (!targets) return null
+  const rootID = await resolveRootSessionID(ctx, input.sessionID)
+  const tree = new Set<string>([input.sessionID, rootID])
+  for (const launcher of launchers(targets)) {
+    if (tree.has(launcher)) continue
+    if ((await resolveRootSessionID(ctx, launcher)) === rootID) tree.add(launcher)
+  }
+  return { text: formatProcessContext(targets, { selfUid: currentUid(), treeSessions: tree }), targets }
+}
 
 /**
  * Pide una decisión al advisor del árbol.

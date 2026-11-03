@@ -56,7 +56,7 @@ apex is one plugin with five independent modules. Each one can be switched on or
 | --- | --- | --- | --- |
 | **Redact** | Detects secrets (API keys, tokens, private keys…) in what the agent sees, encrypts them (AES-256-GCM) and replaces them with a readable marker. When the agent passes the marker back to a tool, the real value is restored. 41 bundles / 104 patterns. | on | [docs/REDACT.md](docs/REDACT.md) |
 | **Events** | Lets programs outside OpenCode (scripts, cron jobs, webhooks, n8n…) notify an agent. **Subscriptions** decide which session receives what. `tools.run` lets those programs use OpenCode tools. | on | [docs/EVENTS.md](docs/EVENTS.md) |
-| **Advisor** | When a tool call needs permission ("ask"), a small dedicated agent decides `allow` or `deny`, so you aren't asked about every step. | on | [docs/ADVISOR.md](docs/ADVISOR.md) |
+| **Advisor** | When a tool call needs permission ("ask"), a small dedicated agent decides `allow` or `deny`, so you aren't asked about every step. For `kill`/`pkill` it is told whose process each target is (read from `/proc`). | on | [docs/ADVISOR.md](docs/ADVISOR.md) |
 | **Guard** | Meta-permissions per agent, tool and path, with a report of what was attempted and decided. | **off** | [docs/GUARD.md](docs/GUARD.md) |
 | **Browser** | Serves OpenCode's `browser.*` tools against an **external** Chromium over CDP (local or remote). You can also switch to the desktop app's built-in browser. 45 actions. | on | [docs/BROWSER.md](docs/BROWSER.md) |
 

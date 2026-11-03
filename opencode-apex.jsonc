@@ -257,9 +257,14 @@
   //             injected. (The global AGENTS.md in ~/.config/opencode always applies.)
   // actions:    filter by tool name (empty = all)
   // system:     system prompt of the advisor agent (optional)
+  // processContext: before judging kill / pkill / killall, read /proc and tell the
+  //             advisor whose process each target is: owner, command, whether an agent
+  //             of THIS conversation launched it, and whether it is critical (OpenCode
+  //             itself). Linux only. (default true)
   // promptTemplate: template of each request ({{requestID}}, {{action}}, {{resources}},
-  //             {{sessionID}}, {{agent}}, {{enforcement}}, {{metadata.<field>}}). A single-line JSON
-  //             string: write line breaks as \n.
+  //             {{sessionID}}, {{agent}}, {{enforcement}}, {{processes}}, {{metadata.<field>}}).
+  //             A template without {{processes}} gets the block appended at the end.
+  //             A single-line JSON string: write line breaks as \n.
   // --------------------------------------------------------------------------
   "advisor": {
     "model": "opencode/big-pickle",
@@ -268,6 +273,7 @@
     "timeoutMs": 10000,
     "location": "",
     "actions": [],
+    "processContext": true,
     "promptTemplate": "Request {{requestID}}\nTool: {{action}}\nResources: {{resources}}\nSession: {{sessionID}} ({{agent}})\n{{enforcement}}\nDecide with apex_advisor_decide."
   }
 
