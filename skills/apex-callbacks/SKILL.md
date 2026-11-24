@@ -1,6 +1,6 @@
 ---
 name: apex-callbacks
-description: Wake an agent up from outside the conversation with opencode-apex (OpenCode V2). Use it to build a relay that turns incoming events into agent tasks — messages (WhatsApp, Telegram, Slack, Matrix, Beeper…), emails, webhooks (GitHub, Stripe, n8n…), queues, any API — or a watcher that checks something on a schedule ("every 5 minutes, is X up?"), or a notification when a job finishes. Covers the server endpoint, subscriptions, writing and running relays in any language and OS, calling OpenCode tools and MCP servers from relay code (tools.run), and receiving Internet webhooks on a machine behind NAT (tunnels such as Cloudflare, reverse connections, store-and-forward).
+description: Wake an agent up from outside the conversation with opencode-apex (OpenCode V2). Use it to build a relay that turns incoming events into agent tasks — messages (WhatsApp, Telegram, Slack, Matrix, Beeper…), emails, webhooks (GitHub, Stripe, n8n…), queues, any API — or a watcher that checks something on a schedule ("every 5 minutes, is X up?"), or a notification when a job finishes. Covers the server endpoint, subscriptions, writing and running relays in any language and OS, calling OpenCode tools and MCP servers from relay code (tools.run), and receiving Internet webhooks on a machine behind NAT (OpenTunnel or other tunnels, OpenCode remote access, reverse connections, store-and-forward).
 ---
 
 # Waking agents from outside: relays, watchers and webhooks
@@ -38,7 +38,8 @@ Call **`apex_callback_endpoint`**. It returns:
 | `rpc.ingest` / `rpc.toolsRun` | Full URLs of the methods, already carrying this project's `location[directory]` |
 | `auth.username` | always `opencode` (HTTP Basic) |
 | `auth.password` | **Where** the password is: `{kind:"file", file, field}` (the service's `0600` record) or `{kind:"env", env}` |
-| `publicUrl` | URL for senders on **other** machines (tunnel or proxy), if one is set |
+| `publicUrl` / `publicUrlSource` | URL for senders on **other** machines, if known. `service-remote` = OpenCode's own remote access (`opencode service set remote true`), found automatically; `runtime` / `config` = set by hand |
+| `publicRpc` | The `rpc.*` URLs over `publicUrl`, for those remote senders |
 | `examples` | `curl` commands ready to copy |
 
 - **Never write the password** into code, unit files, crontab or the conversation. Programs read it when they need it, from `auth.password.file` or from the variable in `auth.password.env`. Read it again on every call: the port and the password change when OpenCode restarts.
@@ -100,10 +101,11 @@ Patterns, the source catalog (WebSocket, SSE, IMAP, polling, queues…), state a
 - A relay that **connects out** to the source can run on a laptop behind NAT next to OpenCode. Examples: WebSocket, SSE, long-poll, IMAP IDLE, polling an API, consuming a queue. This is the default: prefer it whenever the service offers it.
 - A **webhook** means the service connects **in**. A relay on `127.0.0.1` or a home PC behind NAT **cannot be reached from the Internet** unless you add one of these:
   1. the service's outbound mode (Slack Socket Mode, Discord Gateway, Telegram `getUpdates`, Gmail via Pub/Sub pull);
-  2. a tunnel (Cloudflare Tunnel, Tailscale Funnel, ngrok);
+  2. a tunnel: **OpenTunnel** first (`opentunnel route add <relay port>`, from the makers of OpenCode, no account), then Cloudflare Tunnel, Tailscale Funnel or ngrok;
   3. a reverse SSH connection to a VPS;
   4. a small public receiver that stores events while the local relay pulls them (store-and-forward, which survives the PC being off).
-- OpenCode listens on loopback. Run the relay **on the same machine** and expose **the relay**, with its own token, never the OpenCode server. If a sender on another machine must call OpenCode itself, it needs a tunnel to it plus `apex_set_callback_url({url})`. Clear it with `{url: null}`.
+- OpenCode listens on loopback. Run the relay **on the same machine** and expose **the relay**, with its own token, never the OpenCode server: the URL and password of the server give full control of OpenCode. Third-party webhooks (GitHub, Stripe…) always go to a relay.
+- If a sender **you control** on another machine (n8n on a VPS, your phone) must call OpenCode itself, the user turns on OpenCode's remote access: `opencode service set remote true`. `apex_callback_endpoint` then reports it on its own (`publicUrlSource: "service-remote"`) and the sender uses `publicRpc.*`. Any other tunnel to the server: announce it with `apex_set_callback_url({url})`, clear it with `{url: null}`.
 
 Options, commands and security for inbound traffic: **`references/reachability.md`**.
 
@@ -173,6 +175,6 @@ All of them: `POST <baseUrl>/api/rpc/apex/<method>?location[directory]=<project>
 | File | When |
 | --- | --- |
 | `references/relays.md` | Designing any relay: the loop, source catalog, event shape, cursor and dedupe, outbox, several projects, `tools.run` in code |
-| `references/reachability.md` | Webhooks or senders on other machines: outbound modes, Cloudflare/Tailscale/ngrok tunnels, reverse SSH, store-and-forward, signature checks |
+| `references/reachability.md` | Webhooks or senders on other machines: outbound modes, OpenTunnel and OpenCode remote access, Cloudflare/Tailscale/ngrok tunnels, reverse SSH, store-and-forward, signature checks |
 | `references/run-anywhere.md` | Keeping a relay or watcher alive on Linux, macOS, Windows, Docker, pm2, and removing it |
 | `references/examples.md` | Copyable code: sh watcher, Python SSE relay, Node webhook relay, PowerShell ingest, n8n recipe, `tools.run` calls |

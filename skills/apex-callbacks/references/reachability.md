@@ -13,7 +13,7 @@ Facts to start from:
 | Stream or poll API (WebSocket, SSE, long-poll, IMAP, queue) | next to OpenCode | yes | default; nothing to expose |
 | Internet webhook | next to OpenCode, behind NAT | **no** | A, B, C or D below |
 | Service on the same LAN (n8n at home, a NAS) | next to OpenCode | yes, if routable | bind the relay to the LAN address, with a token and a firewall rule |
-| Anything | on another machine (a VPS) | only if it can reach OpenCode | prefer D: the VPS stores events and the local relay pulls them. Otherwise tunnel to OpenCode plus `apex_set_callback_url` |
+| Anything | on another machine (a VPS) | only if it can reach OpenCode | prefer D: the VPS stores events and the local relay pulls them. Otherwise OpenCode's remote access (see the end of this file) |
 | Anything | OpenCode itself runs on a server with a public address | yes | the relay is local to it; expose the relay only |
 
 ## A. The provider's outbound mode (best: nothing exposed)
@@ -34,6 +34,23 @@ Look for it before reaching for a tunnel:
 ## B. A tunnel (public URL, outbound connection from your machine)
 
 The tunnel client connects **out** to the provider. The provider gives you a public HTTPS URL that forwards to a local port. Point it at **the relay's port**, never at the OpenCode server.
+
+**OpenTunnel (first choice)**: by Anomaly, the makers of OpenCode. No account. TLS ends on your machine, so the relay server cannot read the traffic. Prebuilt for Linux and macOS.
+- Install: `curl -fsSL https://opentunnel.xyz/install | sh`, `brew install anomalyco/tap/opentunnel`, or `npm install -g opentunnel`.
+- Publish the relay:
+  ```sh
+  opentunnel route add 8787             # prints https://<random route>.<id>.opentunnel.xyz
+  opentunnel route add 8787 --name hooks   # readable name instead: https://hooks.<id>.opentunnel.xyz
+  opentunnel status                     # routes, connection, log
+  opentunnel route remove <name>        # unpublish
+  ```
+- The first run creates the device's tunnel and its certificate, which takes about a minute. After that, a background service (`opentunnel-default.service` with systemd, launchd on macOS) keeps the route connected, starts at login and reconnects by itself. The URL stays the same while the tunnel exists. `opentunnel delete --yes` drops it for good.
+- It is the same tunnel that OpenCode's remote access uses. Each one claims its own route, so they live side by side. Never route the OpenCode server's port yourself: use remote access for that (end of this file).
+- What the relay can trust:
+  - Every request arrives from `127.0.0.1` with the visitor's own `Host` header, so the relay **cannot** tell a tunneled request from a local one. Never skip the token or signature check because a request "looks local".
+  - A random route is hard to guess, but it is not authentication: anyone who has the URL reaches the relay.
+  - To get the visitor's IP, add `--proxy-protocol v2`, and only for a listener that expects that header.
+- Limits: free hosted service without an uptime guarantee, about 30 new tunnels per hour per IP. You can self-host the server (`OPENTUNNEL_API=<your server>`).
 
 **Cloudflare Tunnel (`cloudflared`)**
 - **Quick tunnel**, no account, for tests: `cloudflared tunnel --url http://127.0.0.1:8787` prints a random `https://….trycloudflare.com`. The URL changes on every run and has no uptime guarantee.
@@ -84,9 +101,20 @@ local relay ──▶ events.ingest
 
 ## Calling OpenCode from another machine (only if you must)
 
-Prefer running the relay next to OpenCode. If a remote sender really has to call `events.ingest` itself, for example n8n on a VPS:
-1. Tunnel or reverse-proxy **to the OpenCode server** with TLS. Anyone with the password then controls the agent, so restrict it at the edge if you can (IP allowlist, Access policy).
-2. Announce the URL with `apex_set_callback_url({url})` so `apex_callback_endpoint` reports it as `publicUrl`. The sender replaces the `baseUrl` part of `rpc.*` with it.
+Prefer running the relay next to OpenCode. Only a sender **you control** may call OpenCode itself, for example n8n on your VPS or a script on your phone. Never give the server URL and password to a third party: together they give full control of OpenCode (sessions, shell, files). Third-party webhooks go to a relay (section B).
+
+**OpenCode's remote access (preferred).** The background service publishes itself through OpenTunnel:
+1. The user runs `opencode service set remote true` or `opencode pair --remote`. It is a change to their machine, so ask first. It works only when OpenCode runs as the background service (`opencode service`), not with `opencode serve` in a terminal.
+2. Call `apex_callback_endpoint`. It finds the URL on its own: `publicUrlSource: "service-remote"`, `publicUrl: https://<secret route>.<id>.opentunnel.xyz`, and the sender uses `publicRpc.*`. Auth is the same Basic `opencode:<password>`: without it the server answers 401.
+3. The sender stores the password as its own secret, for example an n8n credential. It is the password from `auth.password` on this machine. It changes if the service password is reset.
+4. Remote access tells you it is configured, not that it is connected right now. Check with `curl -u … <publicRpc.status>` and expect HTTP 200.
+5. To turn it off: `opencode service set remote false`.
+
+The tunnel lives in the OpenCode service, not in apex. It keeps working while apex is unloaded after 60 minutes idle, and the first RPC loads apex again.
+
+**Any other tunnel or reverse proxy to the server** (Cloudflare, Tailscale, your own nginx):
+1. Use TLS, and restrict access at the edge if you can (IP allowlist, Access policy).
+2. Announce the URL with `apex_set_callback_url({url})`. `apex_callback_endpoint` then reports it as `publicUrl`, and it wins over remote access.
 3. Clear it with `apex_set_callback_url({url: null})` when done.
 
 ## Securing an inbound relay

@@ -463,6 +463,13 @@ function registerCallbackEndpointTool(
             baseUrl: { type: ["string", "null"], description: "Server base URL, as reachable from this machine" },
             source: { type: ["string", "null"], description: "Where baseUrl came from: config | service | argv" },
             publicUrl: { type: ["string", "null"], description: "URL for senders on other machines (tunnel/proxy)" },
+            publicUrlSource: {
+              type: ["string", "null"],
+              description:
+                "runtime (apex_set_callback_url) | config | service-remote (OpenCode remote access: " +
+                "`opencode service set remote true`)",
+            },
+            publicRpc: { type: ["object", "null"], description: "The rpc URLs over publicUrl, for remote senders" },
             directory: { type: "string", description: "Value of location[directory] for every call" },
             auth: { type: "object", description: "Basic opencode:<password>; password says where it is, password.shell prints it" },
             rpc: { type: "object", description: "Full URLs: ingest, toolsRun, status, ping" },
@@ -510,7 +517,8 @@ function registerSetCallbackUrlTool(
         description:
           "Sets (or clears) the public URL through which programs on OTHER machines reach this OpenCode " +
           "server, e.g. a tunnel (cloudflared/ngrok) pointing at its base URL. It is persisted and shown by " +
-          "apex_callback_endpoint. Pass null to clear it. Precedence: runtime > config.",
+          "apex_callback_endpoint. Pass null to clear it. Precedence: runtime > config > OpenCode remote " +
+          "access (found on its own; usually there is no need to set it).",
         input: {
           type: "object",
           properties: {
@@ -865,6 +873,7 @@ export function register(
         directory: ctx.location.directory,
         configUrl: eventsConfig.server.url,
         publicUrl: state.runtimePublicUrl ?? eventsConfig.server.publicUrl ?? null,
+        publicUrlFrom: state.runtimePublicUrl ? "runtime" : "config",
       })
     yield* registerCallbackEndpointTool(ctx, endpoint)
     yield* registerSetCallbackUrlTool(ctx, state, endpoint)

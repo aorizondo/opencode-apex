@@ -5,6 +5,25 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+### Added
+
+- **`apex_callback_endpoint` finds OpenCode's remote access on its own.** When the
+  background service has remote access on (`opencode service set remote true`, an
+  OpenTunnel tunnel that OpenCode keeps up), `publicUrl` reports its address and the new
+  `publicUrlSource` says `service-remote`. Precedence is `apex_set_callback_url` (runtime)
+  > `events.server.publicUrl` (config) > remote access. apex reads the same files as
+  OpenCode: the route from the service config and the tunnel hostname from OpenTunnel's
+  `default` profile. It says that remote access is configured, not that the tunnel is
+  connected right now. `opencode serve` run in a terminal never reports it, because only
+  the service serves the tunnel.
+- `publicRpc`: the `rpc.*` URLs built on `publicUrl`, for senders on other machines.
+- The `apex-callbacks` skill makes OpenTunnel the first tunnel to try. It covers
+  publishing a relay with `opentunnel route add <port>` and what that relay may trust:
+  every request comes from loopback, so it must always check its token or signature. It
+  also covers remote access for senders the user controls. Third-party webhooks always
+  go to a relay, never to the server URL and password, which give full control of
+  OpenCode.
+
 ## [0.2.4] — 2026-11-02
 
 ### Added

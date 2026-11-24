@@ -11,13 +11,17 @@
  *      cuando su pid es este proceso
  *   3. los argumentos `--hostname`/`--port` de `opencode serve`
  *
+ * La URL pública (emisores de otras máquinas) sale de: `apex_set_callback_url` (runtime) >
+ * `events.server.publicUrl` (config) > el acceso remoto del propio servicio
+ * (`opencode service set remote true`, un túnel OpenTunnel que OpenCode mantiene).
+ *
  * La auth es HTTP Basic `opencode:<password>`. El password NUNCA se devuelve: solo
  * dónde leerlo, para que no acabe en la conversación (ni en el proveedor del modelo).
  */
 
 import { readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 
 export const SERVER_USERNAME = "opencode"
 
@@ -35,20 +39,62 @@ export interface ServerEndpoint {
   /** URL base del servidor, alcanzable desde esta máquina (null = desconocida). */
   readonly baseUrl: string | null
   readonly source: "config" | "service" | "argv" | null
-  /** URL para procesos FUERA de esta máquina (túnel / proxy inverso), si se declaró. */
+  /** URL para procesos FUERA de esta máquina (túnel / proxy inverso), si se conoce. */
   readonly publicUrl: string | null
+  /** De dónde salió publicUrl: runtime | config | service-remote (acceso remoto de OpenCode). */
+  readonly publicUrlSource: "runtime" | "config" | "service-remote" | null
   /** Directorio del proyecto al que deben ir las llamadas RPC (`location[directory]`). */
   readonly directory: string
   readonly auth: { readonly scheme: "basic"; readonly username: string; readonly password: PasswordSource | null }
   /** URLs completas de los métodos RPC de apex para este directorio. */
-  readonly rpc: Readonly<Record<"ingest" | "toolsRun" | "status" | "ping", string>>
+  readonly rpc: RpcUrls
+  /** Las mismas URLs sobre publicUrl, para emisores de otras máquinas (null sin publicUrl). */
+  readonly publicRpc: RpcUrls | null
   readonly hint?: string
 }
+
+type RpcUrls = Readonly<Record<"ingest" | "toolsRun" | "status" | "ping", string>>
 
 /** `<state>/opencode` — respeta XDG_STATE_HOME igual que OpenCode. */
 export function stateDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   const base = env.XDG_STATE_HOME && env.XDG_STATE_HOME.length > 0 ? env.XDG_STATE_HOME : join(home, ".local", "state")
   return join(base, "opencode")
+}
+
+/** Config de OpenCode — `OPENCODE_CONFIG_DIR`, si no `<XDG_CONFIG_HOME>/opencode`, como el CLI. */
+export function configDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  if (env.OPENCODE_CONFIG_DIR && env.OPENCODE_CONFIG_DIR.length > 0) return env.OPENCODE_CONFIG_DIR
+  const base = env.XDG_CONFIG_HOME && env.XDG_CONFIG_HOME.length > 0 ? env.XDG_CONFIG_HOME : join(home, ".config")
+  return join(base, "opencode")
+}
+
+/** Identidades de OpenTunnel — `<XDG_DATA_HOME>/opentunnel`, como su SDK. */
+export function tunnelDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return join(env.XDG_DATA_HOME ?? join(home, ".local", "share"), "opentunnel")
+}
+
+/**
+ * URL del acceso remoto del servicio (`opencode service set remote true`), o null.
+ *
+ * El servicio sirve su ruta secreta (`remote.route` de su config, que se llama igual que su
+ * registro) en el túnel OpenTunnel del perfil `default`: `https://<route>.<hostname>`. Es lo
+ * mismo que calcula OpenCode (`RemoteTunnel.hostname`). Dice que está configurado, no que
+ * el túnel esté conectado en este momento.
+ */
+export function findServiceRemoteUrl(serviceFile: string, configDir: string, tunnelDir: string): string | null {
+  try {
+    const config = JSON.parse(readFileSync(join(configDir, basename(serviceFile)), "utf8")) as {
+      remote?: { route?: unknown }
+    }
+    const route = config.remote?.route
+    if (typeof route !== "string" || !/^[a-z0-9-]+$/.test(route)) return null
+    // Sin tunnel.json el certificado aún no está listo: no hay URL que dar.
+    const tunnel = JSON.parse(readFileSync(join(tunnelDir, "default", "tunnel.json"), "utf8")) as { hostname?: unknown }
+    if (typeof tunnel.hostname !== "string" || tunnel.hostname.length === 0) return null
+    return `https://${route}.${tunnel.hostname}`
+  } catch {
+    return null
+  }
 }
 
 /** Host/puerto de `opencode serve` según su argv; null si no es un serve con puerto explícito. */
@@ -99,13 +145,26 @@ export function rpcUrl(base: string, method: string, directory: string): string 
   return `${base.replace(/\/+$/, "")}/api/rpc/apex/${method}?location%5Bdirectory%5D=${encodeURIComponent(directory)}`
 }
 
+function rpcUrls(base: string, directory: string): RpcUrls {
+  return {
+    ingest: rpcUrl(base, "events.ingest", directory),
+    toolsRun: rpcUrl(base, "tools.run", directory),
+    status: rpcUrl(base, "status", directory),
+    ping: rpcUrl(base, "ping", directory),
+  }
+}
+
 export function resolveServerEndpoint(input: {
   readonly directory: string
   readonly configUrl?: string
   readonly publicUrl?: string | null
+  /** Quién fijó `publicUrl` (por defecto config). */
+  readonly publicUrlFrom?: "runtime" | "config"
   readonly argv?: readonly string[]
   readonly pid?: number
   readonly stateDir?: string
+  readonly configDir?: string
+  readonly tunnelDir?: string
 }): ServerEndpoint {
   const argv = input.argv ?? process.argv
   const pid = input.pid ?? process.pid
@@ -141,19 +200,24 @@ export function resolveServerEndpoint(input: {
       : null
 
   const base = baseUrl ?? "<server-url>"
-  const publicUrl = input.publicUrl && input.publicUrl.trim().length > 0 ? input.publicUrl.trim() : null
+  const declared = input.publicUrl && input.publicUrl.trim().length > 0 ? input.publicUrl.trim() : null
+  // Solo el proceso del servicio sirve el acceso remoto; un `opencode serve` suelto no.
+  const remote =
+    declared === null && service
+      ? findServiceRemoteUrl(service.file, input.configDir ?? configDirectory(), input.tunnelDir ?? tunnelDirectory())
+      : null
+  const publicUrl = declared ?? remote
+  const publicUrlSource: ServerEndpoint["publicUrlSource"] =
+    declared !== null ? (input.publicUrlFrom ?? "config") : remote !== null ? "service-remote" : null
   return {
     baseUrl,
     source,
     publicUrl,
+    publicUrlSource,
     directory: input.directory,
     auth: { scheme: "basic", username: SERVER_USERNAME, password },
-    rpc: {
-      ingest: rpcUrl(base, "events.ingest", input.directory),
-      toolsRun: rpcUrl(base, "tools.run", input.directory),
-      status: rpcUrl(base, "status", input.directory),
-      ping: rpcUrl(base, "ping", input.directory),
-    },
+    rpc: rpcUrls(base, input.directory),
+    publicRpc: publicUrl ? rpcUrls(publicUrl, input.directory) : null,
     ...(baseUrl
       ? {}
       : { hint: "Server URL unknown: set events.server.url in the apex config (e.g. http://127.0.0.1:4096)" }),

@@ -229,7 +229,7 @@ createServer(async (req, res) => {
 ```
 
 - Generate the token with `openssl rand -hex 24`, or `[guid]::NewGuid()` twice on Windows.
-- The sender calls `https://<tunnel>/<type>?token=<RELAY_TOKEN>`.
+- Publish the port with `opentunnel route add 8787` (or another tunnel, `reachability.md`). The sender calls `https://<tunnel>/<type>?token=<RELAY_TOKEN>`.
 - GitHub payloads are large. Before shipping, trim `payload.body` to the fields the agent needs.
 
 ## 4. Ingest from PowerShell (Windows PowerShell 5.1 and PowerShell 7)
@@ -258,4 +258,4 @@ Use a *Webhook* node, then an *HTTP Request* node: `POST <rpc.ingest>` with Basi
 {"input":{"source":"github","type":"{{$json.headers['x-github-event']}}","eventID":"github:{{$json.headers['x-github-delivery']}}","payload":{{JSON.stringify($json.body)}}}}
 ```
 
-If n8n runs on another machine, it cannot reach OpenCode's loopback. Either tunnel to it and `apex_set_callback_url`, or let n8n store events while a local relay pulls them (`reachability.md`, option D).
+If n8n runs on another machine, it cannot reach OpenCode's loopback. Either turn on OpenCode's remote access and use `publicRpc.ingest` from `apex_callback_endpoint` (`reachability.md`, last section), or let n8n store events while a local relay pulls them (`reachability.md`, option D).

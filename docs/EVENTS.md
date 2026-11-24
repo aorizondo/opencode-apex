@@ -189,7 +189,9 @@ outside process reaches THIS server:
 | `baseUrl` · `source` | Base URL and where it came from, in this order: `config` (`events.server.url`) > `service` (the background service record `<state>/opencode/service*.json` whose `pid` is this process; `<state>` is `$XDG_STATE_HOME` or `~/.local/state`) > `argv` (the `--hostname`/`--port` of `opencode serve`). `null` if none applies. |
 | `rpc.ingest` · `rpc.toolsRun` · `rpc.status` · `rpc.ping` | Full URLs of the methods, already carrying this project's `location[directory]`. |
 | `auth` | `{scheme:"basic", username:"opencode", password}`. `password` says **where** the password is, never the password itself: `{kind:"file", file, field:"password", shell}` for the background service (the record is a `0600` file), `{kind:"env", env:"OPENCODE_SERVER_PASSWORD", shell}` for `opencode serve`, or `null` if unknown. `shell` is a command that prints it. |
-| `publicUrl` | URL for senders on **other machines** (a tunnel or reverse proxy in front of the server). Runtime value (tool `apex_set_callback_url`) > `events.server.publicUrl`. The `rpc.*` URLs always use `baseUrl`: a remote sender replaces the base with `publicUrl`. |
+| `publicUrl` | URL for senders on **other machines** (a tunnel or reverse proxy in front of the server). Runtime value (tool `apex_set_callback_url`) > `events.server.publicUrl` > OpenCode's remote access (`opencode service set remote true`), which is found automatically. |
+| `publicUrlSource` | `runtime`, `config`, `service-remote` or `null` |
+| `publicRpc` | The `rpc.*` URLs built on `publicUrl` (the `rpc.*` URLs always use `baseUrl`); `null` without `publicUrl` |
 | `examples` | Ready-to-run `curl` commands for `ingest` and `toolsRun` (they read the password at run time). Tool only; `server.info` omits them. |
 | `hint` | Present when `baseUrl` is unknown: set `events.server.url`. |
 

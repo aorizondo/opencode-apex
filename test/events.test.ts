@@ -13,7 +13,8 @@ import { join } from "node:path"
 const APEX = new URL("..", import.meta.url).pathname.replace(/\/$/, "")
 
 const endpointModule = await import(`${APEX}/core/server-endpoint.ts`)
-const { parseServeArgv, findServiceRecord, resolveServerEndpoint, rpcUrl, curlExample, stateDirectory } = endpointModule
+const { parseServeArgv, findServiceRecord, resolveServerEndpoint, rpcUrl, curlExample, stateDirectory, configDirectory,
+  tunnelDirectory, findServiceRemoteUrl } = endpointModule
 const { wildcard, checkTool, contentText } = await import(`${APEX}/core/tools-run.ts`)
 const { parseSkillFile, loadPackagedSkills } = await import(`${APEX}/core/skills.ts`)
 const { APEX_RPC_DEFINITION } = await import(`${APEX}/core/rpc.ts`)
@@ -86,6 +87,41 @@ console.log("\nDescubrimiento del servidor")
   check("desconocido → null + pista", unknown.baseUrl === null && typeof unknown.hint === "string")
   check("publicUrl se recorta y vacía → null",
     resolveServerEndpoint({ directory: "/p", publicUrl: "  ", pid: 1, stateDir: dir }).publicUrl === null)
+
+  // Acceso remoto del servicio: ruta en <config>/opencode/<registro>, hostname en opentunnel/default.
+  const configDir = mkdtempSync(join(tmpdir(), "apex-config-"))
+  const tunnelDir = mkdtempSync(join(tmpdir(), "apex-tunnel-"))
+  const dirs = { configDir, tunnelDir }
+  writeFileSync(join(configDir, "service.json"), JSON.stringify({ remote: { route: "1ed99e1339e95a62" }, env: { T: "x" } }))
+  const noTunnel = resolveServerEndpoint({ directory: "/p", argv: ["serve"], pid: 111, stateDir: dir, ...dirs })
+  check("remoto sin certificado aún → null", noTunnel.publicUrl === null && noTunnel.publicUrlSource === null &&
+    noTunnel.publicRpc === null)
+  mkdirSync(join(tunnelDir, "default"))
+  writeFileSync(join(tunnelDir, "default", "tunnel.json"), JSON.stringify({ id: "abc", hostname: "abc.opentunnel.xyz" }))
+  const remote = resolveServerEndpoint({ directory: "/p", argv: ["serve"], pid: 111, stateDir: dir, ...dirs })
+  check("remoto: https://<route>.<hostname>", remote.publicUrl === "https://1ed99e1339e95a62.abc.opentunnel.xyz" &&
+    remote.publicUrlSource === "service-remote")
+  check("remoto: publicRpc sobre la URL pública",
+    remote.publicRpc?.ingest === "https://1ed99e1339e95a62.abc.opentunnel.xyz/api/rpc/apex/events.ingest?location%5Bdirectory%5D=%2Fp")
+  check("rpc local intacto", remote.rpc.ingest.startsWith("http://127.0.0.1:49374/"))
+  const beta = resolveServerEndpoint({ directory: "/p", argv: ["serve"], pid: 222, stateDir: dir, ...dirs })
+  check("otro canal lee su propia config", beta.publicUrl === null)
+  const loose = resolveServerEndpoint({ directory: "/p", argv: ["serve", "--port", "47125"], pid: 999, stateDir: dir, ...dirs })
+  check("serve suelto no anuncia el túnel del servicio", loose.publicUrl === null)
+  const runtime = resolveServerEndpoint({ directory: "/p", publicUrl: "https://x.example", publicUrlFrom: "runtime",
+    argv: ["serve"], pid: 111, stateDir: dir, ...dirs })
+  check("runtime gana al remoto", runtime.publicUrl === "https://x.example" && runtime.publicUrlSource === "runtime")
+  const cfg = resolveServerEndpoint({ directory: "/p", publicUrl: "https://y.example", argv: ["serve"], pid: 111,
+    stateDir: dir, ...dirs })
+  check("config gana al remoto", cfg.publicUrlSource === "config")
+  writeFileSync(join(configDir, "service.json"), JSON.stringify({ remote: { route: "../x" } }))
+  check("ruta no válida → null", findServiceRemoteUrl(join(dir, "service.json"), configDir, tunnelDir) === null)
+  writeFileSync(join(configDir, "service.json"), JSON.stringify({}))
+  check("remoto apagado → null", findServiceRemoteUrl(join(dir, "service.json"), configDir, tunnelDir) === null)
+  check("OPENCODE_CONFIG_DIR", configDirectory({ OPENCODE_CONFIG_DIR: "/c" } as never, "/h") === "/c")
+  check("~/.config/opencode por defecto", configDirectory({} as never, "/h") === "/h/.config/opencode")
+  check("XDG_DATA_HOME/opentunnel", tunnelDirectory({ XDG_DATA_HOME: "/d" } as never, "/h") === "/d/opentunnel" &&
+    tunnelDirectory({} as never, "/h") === "/h/.local/share/opentunnel")
 }
 
 console.log("\ntools.run")

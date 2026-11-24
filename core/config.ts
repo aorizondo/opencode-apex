@@ -78,7 +78,7 @@ export interface EventsServerConfig {
   /**
    * URL pública por DEFECTO (túnel o proxy inverso hacia el servidor) para emisores
    * de otras máquinas. El agente puede fijarla en runtime con `apex_set_callback_url`
-   * (precedencia: runtime > esta config).
+   * (precedencia: runtime > esta config > acceso remoto del servicio, que se descubre solo).
    */
   publicUrl?: string
 }
