@@ -1,7 +1,7 @@
 {
   "name": "opencode-apex",
-  "version": "0.4.0",
-  "description": "Modular plugin for OpenCode V2 (>= 2.1): secret redaction, RPC callbacks/webhooks/watchers that wake agents, OpenTunnel endpoints + verified webhooks + supervised microservices (cross-platform daemon), tools.run, AI permission advisor, guard meta-permissions, temp-directory access",
+  "version": "0.5.0",
+  "description": "Modular plugin for OpenCode V2 (>= 2.1): secret redaction, RPC callbacks/webhooks/watchers that wake agents, OpenTunnel endpoints + verified webhooks (cross-platform daemon), tools.run, AI permission advisor, guard meta-permissions, temp-directory access",
   "license": "MIT",
   "author": "Antonio Orizondo Leyva",
   "repository": {
@@ -27,8 +27,7 @@
     "cdp",
     "browser",
     "opentunnel",
-    "tunnel",
-    "microservices"
+    "tunnel"
   ],
   "engines": {
     "opencode": ">=2.1.0"

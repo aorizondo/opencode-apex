@@ -1,11 +1,10 @@
 /**
- * Apex Endpoints — el agente publica endpoints y levanta microservicios que reaccionan
- * a llamadas externas, a través del daemon de apex (daemon/main.ts):
+ * Apex Endpoints — el agente publica endpoints que reaccionan a llamadas externas, a
+ * través del daemon de apex (daemon/main.ts):
  *
  * - apex_tunnel:  un puerto local en una ruta del túnel OpenTunnel (open/list/close, TTL)
  * - apex_webhook: un webhook con firma verificada que despierta al agente (create/list/delete)
- * - apex_service: un microservicio supervisado, con ruta pública opcional (up/list/down/restart/logs)
- * - apex_daemon:  estado del daemon, autoarranque y parada
+ * - apex_daemon:  estado y parada del daemon
  *
  * El trabajo lo hace el daemon (un proceso por usuario, fuera del plugin, que OpenCode
  * descarga tras 60 min). Aquí solo se habla con él y se le dice cómo llegar al servidor
@@ -17,7 +16,6 @@ import type { Scope } from "effect"
 import type { Plugin } from "@opencode/plugin/effect"
 import { daemonPaths } from "./daemon/shared.js"
 import { ensureDaemon, hasRegistryEntries, serverTarget, type DaemonClient } from "./core/daemon-client.js"
-import { autostartStatus, setAutostart } from "./core/autostart.js"
 import type { ServerEndpoint } from "./core/server-endpoint.js"
 
 interface EndpointsInput {
@@ -201,85 +199,22 @@ export function register(ctx: Plugin.Context, input: EndpointsInput): Effect.Eff
     })
 
     yield* tool({
-      name: "apex_service",
-      description:
-        "Run a microservice you wrote as a supervised background process that outlives this session (restart " +
-        "with backoff, logs, optional TTL) and optionally publish its port through OpenTunnel. It gets PORT, " +
-        "APEX_PUBLIC_URL, and APEX_INGEST_URL + APEX_INGEST_TOKEN (POST {source,type,payload} to wake agents of " +
-        "this project). up; list; down {id}; restart {id}; logs {id, lines}.",
-      properties: {
-        action: { type: "string", enum: ["up", "list", "down", "restart", "logs"] },
-        name: { type: "string", description: "up: unique name" },
-        command: { type: "string", description: "up: shell command line, e.g. 'node server.js' (bind 127.0.0.1:$PORT)" },
-        cwd: { type: "string", description: "up: working directory (default the project)" },
-        env: { type: "object", additionalProperties: { type: "string" }, description: "up: extra environment" },
-        port: { type: "number", description: "up: port the service listens on (exported as PORT)" },
-        public: { type: "boolean", description: "up: publish the port through OpenTunnel" },
-        route: { type: "string", description: "up, public: readable route name (default random)" },
-        restart: { type: "string", enum: ["always", "on-failure", "never"], description: "up: default always" },
-        ttlMinutes: ttl,
-        id: { type: "string", description: "down/restart/logs: service id or name" },
-        lines: { type: "number", description: "logs: last N lines (default 100)" },
-      },
-      required: ["action"],
-      run: async (args, toolCtx) => {
-        const client = await daemon()
-        const id = encodeURIComponent(String(args.id ?? ""))
-        switch (args.action) {
-          case "list":
-            return { services: (await client.request<{ services: unknown[] }>("GET", "/v1/state")).services }
-          case "down":
-            return client.request("DELETE", `/v1/services/${id}`)
-          case "restart":
-            return client.request("POST", `/v1/services/${id}/restart`, {})
-          case "logs":
-            return client.request("GET", `/v1/services/${id}/logs?lines=${Number(args.lines ?? 100) || 100}`)
-          default: {
-            const up = await client.request<{ url?: string | null; tunnel?: { state?: string } }>("POST", "/v1/services", {
-              ...owner(args, toolCtx),
-              name: args.name,
-              command: args.command,
-              cwd: str(args.cwd),
-              env: args.env,
-              port: args.port,
-              public: args.public === true,
-              route: str(args.route),
-              restart: args.restart,
-            })
-            return args.public === true ? withHint(up) : up
-          }
-        }
-      },
-    })
-
-    yield* tool({
       name: "apex_daemon",
       description:
-        "The apex daemon that keeps tunnels, webhooks and services alive: status (tunnel, everything it keeps, " +
-        "log file), autostart {enabled} after a reboot (cron @reboot / Windows logon task; off by default), stop.",
+        "The apex daemon that keeps tunnels and webhooks alive: status (tunnel state, everything it keeps, log " +
+        "file) or stop (the next apex tool call or plugin load starts it again).",
       properties: {
-        action: { type: "string", enum: ["status", "autostart", "stop"] },
-        enabled: { type: "boolean", description: "autostart: on or off" },
+        action: { type: "string", enum: ["status", "stop"] },
       },
       required: ["action"],
       run: async (args) => {
-        if (args.action === "autostart") {
-          if (args.enabled === true) await daemon() // escribe el lanzador con las rutas actuales
-          return { autostart: setAutostart(args.enabled === true, paths) }
-        }
         const client = await daemon(args.action !== "stop")
         if (args.action === "stop") {
           await client.request("POST", "/v1/shutdown", {}).catch(() => undefined)
-          return { stopped: true, note: "services keep running; the next apex tool call or plugin load restarts the daemon" }
+          return { stopped: true }
         }
         const state = await client.request("GET", "/v1/state")
-        let autostart: unknown
-        try {
-          autostart = autostartStatus(paths)
-        } catch (error) {
-          autostart = { error: String((error as Error).message ?? error) }
-        }
-        return { ...state, autostart, log: paths.log, home: paths.home }
+        return { ...state, log: paths.log, home: paths.home }
       },
     })
   })

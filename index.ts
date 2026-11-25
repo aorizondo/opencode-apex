@@ -9,8 +9,8 @@
  * - browser: (deprecated, off by default; OpenCode's browse replaces it) browser.* tools
  *   against a headless or remote Chromium over CDP (attach on request)
  * - tempAccess: external_directory without prompts in OpenCode's temp directory
- * - endpoints: OpenTunnel routes, verified webhooks and supervised microservices, kept
- *   by a per-user apex daemon that outlives the plugin (daemon/main.ts)
+ * - endpoints: OpenTunnel routes and verified webhooks, kept by a per-user apex daemon
+ *   that outlives the plugin (daemon/main.ts)
  *
  * Built on the official Effect plugin API: https://opencode.ai/v2/docs/build/plugins/effect/
  */
@@ -32,7 +32,7 @@ import { registerTempAccess } from "./core/temp-access.js"
 import { register as registerEndpoints } from "./endpoints.js"
 
 // Plugin version
-const VERSION = "0.4.0"
+const VERSION = "0.5.0"
 
 interface ModuleConfigs {
   redact: RedactConfig & { enabled: boolean }
@@ -156,7 +156,7 @@ export default Plugin.define({
         yield* registerAdvisor(ctx, moduleConfigs.advisor)
       }
 
-      // Túneles, webhooks verificados y microservicios, vía el daemon de apex.
+      // Túneles y webhooks verificados, vía el daemon de apex.
       if (validatedConfig.modules?.endpoints ?? true) {
         yield* registerEndpoints(ctx, { version: VERSION, endpoint: events?.endpoint ?? null })
       }

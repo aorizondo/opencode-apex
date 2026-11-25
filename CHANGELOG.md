@@ -5,6 +5,29 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-25
+
+### Removed
+
+- **`apex_service` (supervised microservices) and daemon autostart.** They made the apex
+  daemon much larger without being needed to receive webhooks or publish a port. What was
+  removed:
+  - the supervisor: restarts with backoff, adopting processes from a previous daemon, logs,
+    and the per-service ingest token;
+  - autostart: the crontab or Windows logon task, and its launcher script.
+
+  The daemon now does two things: OpenTunnel routes and verified webhooks. To expose its own
+  microservice, the agent runs it (skill `apex-callbacks`, `run-anywhere.md`) and publishes
+  its port with `apex_tunnel`. After a reboot, the daemon comes back when apex loads in any
+  project.
+
+### Changed
+
+- Webhook routes are read straight from the webhook entries instead of being duplicated as
+  tunnel entries.
+- The daemon's ports are no longer persisted between runs.
+- A newer plugin simply stops the old daemon and starts its own.
+
 ## [0.4.0] — 2026-11-25
 
 ### Added

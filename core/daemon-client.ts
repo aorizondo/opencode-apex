@@ -8,7 +8,7 @@
  */
 
 import { spawn } from "node:child_process"
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { daemonPaths, type DaemonInfo, type DaemonPaths, type ServerTarget } from "../daemon/shared.js"
 import type { ServerEndpoint } from "./server-endpoint.js"
@@ -42,20 +42,6 @@ export function daemonCommand(version: string, execPath = process.execPath, scri
   const env: Record<string, string> = { BUN_BE_BUN: "1", APEX_DAEMON_VERSION: version }
   if (home) env.APEX_DAEMON_HOME = home
   return { command: execPath, args: [script], env }
-}
-
-/** Lanzador para el autoarranque (crontab @reboot / tarea de Windows), con las rutas de hoy. */
-export function launcherText(version: string, paths: DaemonPaths, platform = process.platform, execPath = process.execPath): string {
-  const { command, args, env } = daemonCommand(version, execPath, DAEMON_SCRIPT, paths.home)
-  // La identidad de OpenTunnel vive en XDG_DATA_HOME: cron no la hereda.
-  if (process.env.XDG_DATA_HOME) env.XDG_DATA_HOME = process.env.XDG_DATA_HOME
-  if (platform === "win32") {
-    const sets = Object.entries(env).map(([key, value]) => `set "${key}=${value}"`)
-    return ["@echo off", ...sets, `"${command}" "${args[0]}" >> "${paths.log}" 2>&1`, ""].join("\r\n")
-  }
-  const quote = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`
-  const exports = Object.entries(env).map(([key, value]) => `export ${key}=${quote(value)}`)
-  return ["#!/bin/sh", ...exports, `exec ${quote(command)} ${quote(args[0]!)} >> ${quote(paths.log)} 2>&1`, ""].join("\n")
 }
 
 function readInfo(paths: DaemonPaths): DaemonInfo | null {
@@ -113,7 +99,7 @@ export async function ensureDaemon(options: EnsureOptions): Promise<DaemonClient
   let info = readInfo(paths)
   let health = await healthy(info)
   if (health && info && newerVersion(options.version, health.version)) {
-    // Plugin actualizado: el daemon viejo cede (los servicios siguen vivos y el nuevo los adopta).
+    // Plugin actualizado: el daemon viejo se cierra y arranca el nuevo.
     await call(info, "POST", "/v1/shutdown", {}).catch(() => undefined)
     for (let i = 0; i < 50 && (await healthy(info)); i++) await sleep(100)
     health = null
@@ -122,7 +108,6 @@ export async function ensureDaemon(options: EnsureOptions): Promise<DaemonClient
   if (!options.spawn) return null
 
   mkdirSync(paths.home, { recursive: true, mode: 0o700 })
-  writeLauncher(options.version, paths)
   const { command, args, env } = daemonCommand(options.version, process.execPath, DAEMON_SCRIPT, paths.home)
   const fd = openSync(paths.log, "a", 0o600)
   try {
@@ -150,20 +135,12 @@ function client(info: DaemonInfo): DaemonClient {
   return { info, request: (method, path, body) => call(info, method, path, body) }
 }
 
-export function writeLauncher(version: string, paths: DaemonPaths = daemonPaths()): void {
-  try {
-    writeFileSync(paths.launcher, launcherText(version, paths), { mode: 0o700 })
-  } catch {
-    // best-effort: solo lo usa el autoarranque
-  }
-}
-
 /** ¿Hay algo que mantener? (sin registro no se lanza nada al cargar el plugin). */
 export function hasRegistryEntries(paths: DaemonPaths = daemonPaths()): boolean {
   if (!existsSync(paths.registry)) return false
   try {
     const registry = JSON.parse(readFileSync(paths.registry, "utf8")) as Record<string, unknown[] | undefined>
-    return ["tunnels", "webhooks", "services"].some((key) => (registry[key]?.length ?? 0) > 0)
+    return ["tunnels", "webhooks"].some((key) => (registry[key]?.length ?? 0) > 0)
   } catch {
     return false
   }

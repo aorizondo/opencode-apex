@@ -12,9 +12,8 @@ import { join } from "node:path"
 
 const APEX = new URL("..", import.meta.url).pathname.replace(/\/$/, "")
 const { verify, toIngest, forwardedHeaders, parseBody, slackChallenge } = await import(`${APEX}/daemon/webhooks.ts`)
-const { daemonPaths, bootStamp, validRouteName, randomRoute } = await import(`${APEX}/daemon/shared.ts`)
-const { ensureDaemon, newerVersion, launcherText, serverTarget, hasRegistryEntries } = await import(`${APEX}/core/daemon-client.ts`)
-const { editCrontab, CRON_MARKER } = await import(`${APEX}/core/autostart.ts`)
+const { daemonPaths, validRouteName, randomRoute } = await import(`${APEX}/daemon/shared.ts`)
+const { ensureDaemon, newerVersion, serverTarget, hasRegistryEntries } = await import(`${APEX}/core/daemon-client.ts`)
 
 let passed = 0
 let failed = 0
@@ -80,16 +79,6 @@ console.log("piezas")
   check("newerVersion", newerVersion("0.4.1", "0.4.0") && !newerVersion("0.4.0", "0.4.0") && !newerVersion("0.3.9", "0.4.0") && newerVersion("1.0.0", "0.9.9"))
   check("rutas aleatorias válidas", validRouteName(randomRoute()) && randomRoute().length === 16)
   check("ruta inválida", !validRouteName("Con_Mayus") && !validRouteName("-x") && validRouteName("hooks"))
-  check("bootStamp estable", bootStamp(1_000_000_000, 100) === bootStamp(1_000_002_000, 102))
-  const cron = editCrontab("0 * * * * job\n", "/h/launch.sh", true)
-  check("crontab: añade @reboot y conserva lo demás", cron.startsWith("0 * * * * job\n") && cron.includes(`@reboot /bin/sh '/h/launch.sh' ${CRON_MARKER}`))
-  check("crontab: idempotente", editCrontab(cron, "/h/launch.sh", true) === cron)
-  check("crontab: quita solo lo suyo", editCrontab(cron, "/h/launch.sh", false) === "0 * * * * job\n")
-  const paths = daemonPaths("/h o'k")
-  const sh = launcherText("0.4.0", paths, "linux", "/opt/oc/opencode")
-  check("lanzador sh: BUN_BE_BUN y comillas", sh.includes("export BUN_BE_BUN='1'") && sh.includes(`'/h o'\\''k/daemon.log'`) && sh.includes("exec '/opt/oc/opencode'"))
-  const cmd = launcherText("0.4.0", daemonPaths("C:\\h"), "win32", "C:\\oc\\opencode.exe")
-  check("lanzador cmd", cmd.includes('set "BUN_BE_BUN=1"') && cmd.includes('"C:\\oc\\opencode.exe"'))
   const target = serverTarget(
     { baseUrl: "http://127.0.0.1:4096", auth: { password: { kind: "env", env: "PW_TEST", shell: "" } } } as never,
     { PW_TEST: "x" },
@@ -138,7 +127,6 @@ const freePort = async () => {
 type Client = { info: { pid: number }; request: <T = any>(method: string, path: string, body?: unknown) => Promise<T> }
 const ensure = ensureDaemon as (options: unknown) => Promise<Client | null>
 let daemon: Client | null = null
-let servicePid: number | null = null
 try {
   check("sin registro no hay nada que mantener", !hasRegistryEntries(paths))
   check("sin spawn no lanza", (await ensure({ version: "0.4.0", spawn: false, paths })) === null)
@@ -187,59 +175,6 @@ try {
   const other = await post(`sha256=${sign(secret, body)}`, "noexiste")
   check("ruta desconocida → 404", other.status === 404)
 
-  // Servicio: escucha en PORT y, al arrancar, avisa por el ingest local del daemon.
-  const port = await freePort()
-  const script = join(home, "svc.mjs")
-  writeFileSync(
-    script,
-    `import http from "node:http"
-http.createServer((q, s) => s.end("hola " + process.env.APEX_SERVICE_NAME)).listen(Number(process.env.PORT), "127.0.0.1")
-await fetch(process.env.APEX_INGEST_URL, { method: "POST", headers: { authorization: "Bearer " + process.env.APEX_INGEST_TOKEN },
-  body: JSON.stringify({ type: "service.ready", payload: { port: process.env.PORT } }) })
-`,
-  )
-  const svc = await daemon!.request<{ id: string; pid: number; status: string; ingestToken?: string }>("POST", "/v1/services", {
-    directory: DIR,
-    name: "eco",
-    command: `node ${JSON.stringify(script)}`,
-    cwd: home,
-    port,
-  })
-  check("servicio: no expone su token de ingest", svc.ingestToken === undefined && svc.status === "running" && svc.pid > 0, svc)
-  const noCwd = await daemon!.request("POST", "/v1/services", { directory: DIR, name: "x", command: "true" }).then(() => false, () => true)
-  check("cwd inexistente → error claro", noCwd)
-  let text = ""
-  for (let i = 0; i < 50 && !text; i++) {
-    await sleep(100)
-    text = await fetch(`http://127.0.0.1:${port}/`).then((r) => r.text(), () => "")
-  }
-  check("servicio responde en su PORT", text === "hola eco", text)
-  for (let i = 0; i < 30 && !ingests.some((x) => x.input.type === "service.ready"); i++) await sleep(100)
-  const ready = ingests.find((x) => x.input.type === "service.ready")
-  check("servicio → ingest local (source service:eco)", ready?.input.source === "service:eco" && ready.directory === DIR, ready)
-
-  // Relevo: el daemon se va, otro (más nuevo) adopta el servicio sin reiniciarlo.
-  const before = (await daemon!.request<{ services: { pid: number }[] }>("GET", "/v1/state")).services[0]!.pid
-  servicePid = before
-  const newer = await ensure({ version: "0.4.1", spawn: true, paths })
-  check("versión más nueva sustituye al daemon", newer !== null && newer.info.pid !== daemon!.info.pid)
-  daemon = newer
-  const adopted = (await daemon!.request<{ services: { pid: number; status: string }[] }>("GET", "/v1/state")).services[0]!
-  check("el servicio sigue vivo y adoptado (mismo pid)", before > 0 && adopted.pid === before && adopted.status === "running", adopted)
-  check("…y sigue respondiendo", (await fetch(`http://127.0.0.1:${port}/`).then((r) => r.text(), () => "")) === "hola eco")
-
-  const logs = await daemon!.request<{ text: string }>("GET", "/v1/services/eco/logs?lines=20")
-  check("logs del servicio", logs.text.includes("start: node"))
-
-  await daemon!.request("DELETE", "/v1/services/eco")
-  let down = false
-  for (let i = 0; i < 60 && !down; i++) {
-    await sleep(100)
-    down = (await fetch(`http://127.0.0.1:${port}/`).then(() => false, () => true))
-  }
-  check("down para el proceso (también adoptado)", down)
-  servicePid = null
-
   // TTL
   const temp = await daemon!.request<{ id: string }>("POST", "/v1/tunnels", { directory: DIR, port: await freePort(), ttlMinutes: 0.01 })
   check("túnel temporal registrado", typeof temp.id === "string")
@@ -249,17 +184,17 @@ await fetch(process.env.APEX_INGEST_URL, { method: "POST", headers: { authorizat
   const blocked = await daemon!.request("POST", "/v1/tunnels", { directory: DIR, port: fakePort }).then(() => false, () => true)
   check("no deja publicar el puerto del servidor de OpenCode", blocked)
 
+  const newer = await ensure({ version: "0.4.1", spawn: true, paths })
+  check("versión más nueva sustituye al daemon", newer !== null && newer.info.pid !== daemon!.info.pid)
+  daemon = newer
+  const kept = await daemon!.request<{ webhooks: { name: string }[] }>("GET", "/v1/state")
+  check("el nuevo daemon conserva el webhook", kept.webhooks[0]?.name === "repo")
   await daemon!.request("DELETE", `/v1/webhooks/repo`)
   const gone = await daemon!.request<{ webhooks: unknown[] }>("GET", "/v1/state")
   check("borrar webhook", gone.webhooks.length === 0)
 } catch (error) {
   check(`sin excepciones: ${String((error as Error).message)} ${String((error as Error).stack ?? error)}`, false)
 } finally {
-  if (servicePid) {
-    try {
-      process.kill(-servicePid, "SIGKILL")
-    } catch {}
-  }
   await daemon?.request("POST", "/v1/shutdown", {}).catch(() => undefined)
   fake.close()
 }

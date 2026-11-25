@@ -266,7 +266,7 @@ export const apexConfigSchema = z.object({
       browser: z.boolean().optional(),
       // Activado por defecto: external_directory sin preguntar en <tmpdir>/opencode.
       tempAccess: z.boolean().optional(),
-      // Activado por defecto: apex_tunnel/webhook/service/daemon (el daemon solo se lanza al usarlas).
+      // Activado por defecto: apex_tunnel/webhook/daemon (el daemon solo se lanza al usarlas).
       endpoints: z.boolean().optional(),
     })
     .default(() => ({})),

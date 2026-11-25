@@ -41,7 +41,7 @@
     "browser": false,
     // external_directory without asking in <tmpdir>/opencode (OpenCode's temp dir)
     "tempAccess": true,
-    // Túneles OpenTunnel, webhooks verificados y microservicios (daemon de apex, solo al usarlos)
+    // Túneles OpenTunnel y webhooks verificados (daemon de apex, solo al usarlos)
     "endpoints": true
   },
 

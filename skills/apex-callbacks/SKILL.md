@@ -101,7 +101,7 @@ Patterns, the source catalog (WebSocket, SSE, IMAP, polling, queues…), state a
 - A relay that **connects out** to the source can run on a laptop behind NAT next to OpenCode. Examples: WebSocket, SSE, long-poll, IMAP IDLE, polling an API, consuming a queue. This is the default: prefer it whenever the service offers it.
 - A **webhook** means the service connects **in**. A relay on `127.0.0.1` or a home PC behind NAT **cannot be reached from the Internet** unless you add one of these:
   1. the service's outbound mode (Slack Socket Mode, Discord Gateway, Telegram `getUpdates`, Gmail via Pub/Sub pull);
-  2. **`apex_webhook`**, the shortest path: a public OpenTunnel URL that checks the GitHub, Stripe or Slack signature, a generic HMAC or a token, then calls `events.ingest` locally. You write no relay code. Use **`apex_tunnel`** to publish a relay of your own, and **`apex_service`** to keep it running. Skill **`apex-endpoints`** covers all three. Without apex: `opentunnel route add <relay port>`, Cloudflare Tunnel, Tailscale Funnel or ngrok;
+  2. **`apex_webhook`**, the shortest path: a public OpenTunnel URL that checks the GitHub, Stripe or Slack signature, a generic HMAC or a token, then calls `events.ingest` locally. You write no relay code. Use **`apex_tunnel`** to publish a relay of your own (skill **`apex-endpoints`**). Without apex: `opentunnel route add <relay port>`, Cloudflare Tunnel, Tailscale Funnel or ngrok;
   3. a reverse SSH connection to a VPS;
   4. a small public receiver that stores events while the local relay pulls them (store-and-forward, which survives the PC being off).
 - OpenCode listens on loopback. Run the relay **on the same machine** and expose **the relay**, with its own token, never the OpenCode server: the URL and password of the server give full control of OpenCode. Third-party webhooks (GitHub, Stripe…) always go to a relay.
@@ -140,11 +140,7 @@ A relay must:
 - keep logs;
 - read secrets from `0600` files, never from the unit or command line.
 
-Run it as the **same user** as OpenCode, so it can read the password record.
-
-**First choice, on any OS: `apex_service`**. The apex daemon supervises it: restarts with backoff, keeps a log, applies an optional TTL and can give it a public URL. It survives the plugin unload and works with any init system (systemd, sysvinit…) and on Windows. The service gets `APEX_INGEST_URL` + `APEX_INGEST_TOKEN`, so it wakes agents **without the server password**. To survive a reboot, turn on `apex_daemon({action:"autostart", enabled:true})` once (see skill `apex-endpoints`).
-
-A watcher needs a scheduler instead of a supervisor. For a watcher, or when you need OS units (systemd, launchd, Task Scheduler, NSSM/WinSW, Docker, pm2), read **`references/run-anywhere.md`**.
+Run it as the **same user** as OpenCode, so it can read the password record. A watcher needs a scheduler instead of a supervisor. Ready-made units for systemd (Linux), launchd (macOS), Task Scheduler and NSSM/WinSW (Windows), Docker and pm2 are in **`references/run-anywhere.md`**. If the only job is turning a third-party webhook into an event, `apex_webhook` needs no program at all.
 
 ## Before you call it done
 
@@ -182,4 +178,4 @@ All of them: `POST <baseUrl>/api/rpc/apex/<method>?location[directory]=<project>
 | `references/reachability.md` | Webhooks or senders on other machines: outbound modes, OpenTunnel and OpenCode remote access, Cloudflare/Tailscale/ngrok tunnels, reverse SSH, store-and-forward, signature checks |
 | `references/run-anywhere.md` | Keeping a relay or watcher alive on Linux, macOS, Windows, Docker, pm2, and removing it |
 | `references/examples.md` | Copyable code: sh watcher, Python SSE relay, Node webhook relay, PowerShell ingest, n8n recipe, `tools.run` calls |
-| skill `apex-endpoints` | `apex_webhook` / `apex_tunnel` / `apex_service` / `apex_daemon`: public URLs, verified webhooks and supervised microservices without writing a relay or units |
+| skill `apex-endpoints` | `apex_webhook` / `apex_tunnel` / `apex_daemon`: verified webhooks without a relay, public URLs for your own service |
