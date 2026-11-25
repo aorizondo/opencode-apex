@@ -1,5 +1,17 @@
 # Browser module — drive an external Chromium with OpenCode's `browser` tools
 
+> [!WARNING]
+> **Deprecated since 0.3.0, and off by default.** To let agents use **your own browser**,
+> with its tabs and logins, use OpenCode's [browse](https://opencode.ai/product/browse): an
+> MCP server and a Chromium extension made by the OpenCode team. It needs no remote
+> debugging and no consent prompt, hands the tab back to you for logins and 2FA, and works
+> in any MCP client.
+>
+> This module remains for what browse does not do: serving OpenCode's own `browser.*` tools
+> from a **headless or remote Chromium over CDP** (a server, CI, a tunnel), and the
+> `browser.*` performance captures (trace, CPU, heap). Turn it on with
+> `"modules": { "browser": true }`. It may be removed in a later release.
+
 > **OpenCode V2 only (2.1 or newer).** OpenCode V1 has a different plugin system and
 > cannot load apex.
 
@@ -40,7 +52,7 @@ descriptions are still OpenCode's own. apex only provides the browser behind the
    Port 9333 rather than the usual 9222: a stale `DevToolsActivePort` file from your
    everyday Chrome often still claims 9222.
 
-2. Make sure the module is on (it is by default) and point it at that port:
+2. Turn the module on (it is off by default since 0.3.0) and point it at that port:
 
    ```jsonc
    // in the apex options (see docs/CONFIG.md)
@@ -205,7 +217,7 @@ fewer items, a shallower snapshot, or only the needed fields.
 
 ```jsonc
 {
-  "modules": { "browser": true },     // on by default
+  "modules": { "browser": true },     // off by default since 0.3.0
   "browser": {
     "mode": "auto",                   // in-app | external | auto
     "cdpUrl": "auto",                 // "auto" | "9222" | "ws://…" | "wss://…"

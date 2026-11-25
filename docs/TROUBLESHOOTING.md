@@ -181,8 +181,11 @@ apex merges three sources. Each one overrides the previous:
 
 ## The browser tools say "No desktop browser is connected"
 
-See [BROWSER.md](BROWSER.md): a session only gets a browser after `browser_target` or
-`/browser-target` asks for one.
+To let agents use your own browser, install OpenCode's
+[browse](https://opencode.ai/product/browse) and use its `browse` tools instead. For a
+headless or remote Chromium, turn on apex's deprecated browser module (`"modules":
+{ "browser": true }`, see [BROWSER.md](BROWSER.md)): a session only gets a browser after
+`browser_target` or `/browser-target` asks for one.
 
 ---
 

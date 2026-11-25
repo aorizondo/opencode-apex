@@ -81,7 +81,7 @@ but are overridden by the local file.
 Each module has exactly one switch, under `modules`:
 
 ```jsonc
-"modules": { "redact": true, "events": true, "advisor": true, "guard": false, "browser": true }
+"modules": { "redact": true, "events": true, "advisor": true, "guard": false, "browser": false, "tempAccess": true }
 ```
 
 | Module | Default when the key is omitted |
@@ -90,7 +90,8 @@ Each module has exactly one switch, under `modules`:
 | `events` | on |
 | `advisor` | on |
 | `guard` | **off** (it can block the agent if its rules are wrong, so you opt in) |
-| `browser` | on |
+| `browser` | **off** since 0.3.0 (deprecated: use OpenCode's [browse](https://opencode.ai/product/browse)) |
+| `tempAccess` | on |
 
 There is no `<module>.enabled` key. A legacy `events.enabled` is ignored and logs a
 warning. So does `events.listener`: the HTTP listener was removed in 0.2.0, see

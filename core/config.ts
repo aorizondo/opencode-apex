@@ -262,7 +262,7 @@ export const apexConfigSchema = z.object({
       events: z.boolean().optional(),
       advisor: z.boolean().optional(),
       guard: z.boolean().optional(),
-      // Activado por defecto; en modo external puede abrir un popup de Chrome.
+      // Obsoleto, desactivado por defecto: para tu navegador, `browse` de OpenCode.
       browser: z.boolean().optional(),
       // Activado por defecto: external_directory sin preguntar en <tmpdir>/opencode.
       tempAccess: z.boolean().optional(),

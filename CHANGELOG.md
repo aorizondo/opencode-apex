@@ -5,6 +5,19 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-11-25
+
+### Deprecated
+
+- **The browser module is deprecated and now off by default.** OpenCode's own
+  [browse](https://opencode.ai/product/browse) (an MCP server plus a Chromium extension)
+  lets agents use your real browser: your tabs and logins, no remote debugging and no
+  consent prompt, handoffs for logins and 2FA, tab recordings. With both on, the agent
+  got two browser toolsets that overlapped. The module stays for what browse does not do:
+  serving OpenCode's `browser.*` tools from a headless or remote Chromium over CDP, and the
+  `browser.*` performance captures. Turn it back on with `"modules": { "browser": true }`;
+  it logs a deprecation warning. It may be removed in a later release.
+
 ## [0.2.6] — 2026-11-25
 
 ### Added

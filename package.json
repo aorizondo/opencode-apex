@@ -1,7 +1,7 @@
 {
   "name": "opencode-apex",
-  "version": "0.2.6",
-  "description": "Modular plugin for OpenCode V2 (>= 2.1): secret redaction, RPC callbacks/webhooks/watchers that wake agents, tools.run, AI permission advisor, guard meta-permissions, external browser over CDP",
+  "version": "0.3.0",
+  "description": "Modular plugin for OpenCode V2 (>= 2.1): secret redaction, RPC callbacks/webhooks/watchers that wake agents, tools.run, AI permission advisor, guard meta-permissions, temp-directory access, (deprecated) headless browser over CDP",
   "license": "MIT",
   "author": "Antonio Orizondo Leyva",
   "repository": {

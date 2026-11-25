@@ -30,14 +30,15 @@
   // --------------------------------------------------------------------------
   // Modules: turn each one on or off.
   // SINGLE SWITCH: it lives ONLY here — there is no <module>.enabled.
-  // An omitted key means the module's default: all ON except guard (OFF).
+  // An omitted key means the module's default: all ON except guard and browser (OFF).
   // --------------------------------------------------------------------------
   "modules": {
     "redact": true,
     "events": false,
     "advisor": true,
     "guard": false,
-    "browser": true,
+    // Deprecated: use OpenCode's browse for your browser (docs/BROWSER.md)
+    "browser": false,
     // external_directory without asking in <tmpdir>/opencode (OpenCode's temp dir)
     "tempAccess": true
   },

@@ -6,7 +6,9 @@
  * - events: RPC event ingestion (callbacks/webhooks), subscriptions, delivery, tools.run
  * - advisor: allow/deny permission decisions via a dedicated agent + side session
  * - guard: meta-permissions per agent/tool/path (opt-in)
- * - browser: browser.* tools against an external Chromium over CDP (attach on request)
+ * - browser: (deprecated, off by default; OpenCode's browse replaces it) browser.* tools
+ *   against a headless or remote Chromium over CDP (attach on request)
+ * - tempAccess: external_directory without prompts in OpenCode's temp directory
  *
  * Built on the official Effect plugin API: https://opencode.ai/v2/docs/build/plugins/effect/
  */
@@ -27,7 +29,7 @@ import { compatibilityWarnings } from "./core/compat.js"
 import { registerTempAccess } from "./core/temp-access.js"
 
 // Plugin version
-const VERSION = "0.2.6"
+const VERSION = "0.3.0"
 
 interface ModuleConfigs {
   redact: RedactConfig & { enabled: boolean }
@@ -55,11 +57,13 @@ function getModuleConfigs(userConfig: ApexConfig): ModuleConfigs {
       agents: { ...createDefaultGuardConfig().agents, ...userConfig.guard?.agents },
       enabled: userConfig.modules?.guard ?? false,
     },
-    // Activado por defecto; en modo `external` puede abrir un popup de Chrome por conexión.
+    // Obsoleto desde 0.3.0, desactivado por defecto: para usar tu navegador está `browse`
+    // de OpenCode (https://opencode.ai/product/browse). Queda para Chromium headless o
+    // remoto por CDP y para las capturas de rendimiento de `browser.*`.
     browser: {
       ...createDefaultBrowserConfig(),
       ...userConfig.browser,
-      enabled: userConfig.modules?.browser ?? true,
+      enabled: userConfig.modules?.browser ?? false,
     },
   }
 }
@@ -150,6 +154,9 @@ export default Plugin.define({
       }
 
       if (moduleConfigs.browser.enabled) {
+        yield* Effect.logWarning(
+          "[apex.browser] deprecated: use OpenCode's browse (https://opencode.ai/product/browse) to drive your browser; keep this module only for a headless or remote Chromium over CDP",
+        )
         yield* registerBrowser(ctx, moduleConfigs.browser)
       }
 
