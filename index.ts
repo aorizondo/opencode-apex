@@ -24,9 +24,10 @@ import { register as registerBrowser, createDefaultBrowserConfig, type BrowserCo
 import { registerCentralRpc } from "./core/rpc.js"
 import { registerSkills } from "./core/skills.js"
 import { compatibilityWarnings } from "./core/compat.js"
+import { registerTempAccess } from "./core/temp-access.js"
 
 // Plugin version
-const VERSION = "0.2.5"
+const VERSION = "0.2.6"
 
 interface ModuleConfigs {
   redact: RedactConfig & { enabled: boolean }
@@ -137,6 +138,11 @@ export default Plugin.define({
       // aprobaría cosas que el guard iba a prohibir.
       if (moduleConfigs.guard.enabled) {
         yield* registerGuard(ctx, moduleConfigs.guard)
+      }
+
+      // Después del guard (sus deny se respetan) y antes del advisor (no ve lo ya resuelto).
+      if (validatedConfig.modules?.tempAccess ?? true) {
+        yield* registerTempAccess(ctx)
       }
 
       if (moduleConfigs.advisor.enabled) {

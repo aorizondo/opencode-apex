@@ -37,7 +37,9 @@
     "events": false,
     "advisor": true,
     "guard": false,
-    "browser": true
+    "browser": true,
+    // external_directory without asking in <tmpdir>/opencode (OpenCode's temp dir)
+    "tempAccess": true
   },
 
 

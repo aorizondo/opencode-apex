@@ -48,7 +48,7 @@ A few OpenCode terms used throughout these docs:
 | **Skill** | A Markdown guide an agent can load when a task needs it. apex ships one. |
 | **RPC** | Here, an **authenticated HTTP POST to the OpenCode server** that runs a method a plugin registered: `POST <server>/api/rpc/apex/<method>`. It lets scripts and other programs talk to apex. |
 
-apex is one plugin with five independent modules. Each one can be switched on or off.
+apex is one plugin with six independent modules. Each one can be switched on or off.
 
 ## Modules
 
@@ -59,6 +59,7 @@ apex is one plugin with five independent modules. Each one can be switched on or
 | **Advisor** | When a tool call needs permission ("ask"), a small dedicated agent decides `allow` or `deny`, so you aren't asked about every step. For `kill`/`pkill` it is told whose process each target is (read from `/proc`). | on | [docs/ADVISOR.md](docs/ADVISOR.md) |
 | **Guard** | Meta-permissions per agent, tool and path, with a report of what was attempted and decided. | **off** | [docs/GUARD.md](docs/GUARD.md) |
 | **Browser** | Serves OpenCode's `browser.*` tools against an **external** Chromium over CDP (local or remote). You can also switch to the desktop app's built-in browser. 45 actions. | on | [docs/BROWSER.md](docs/BROWSER.md) |
+| **Temp access** | Allows `external_directory` in OpenCode's temporary directory (`<tmpdir>/opencode`, `/tmp/opencode` on Linux) without asking. OpenCode tells the model to use it but no rule approves it. A deny you configure for that path still wins. | on | — |
 
 Turn modules on or off in `modules`. That is the only switch: there is no `<module>.enabled`.
 

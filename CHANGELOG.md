@@ -5,6 +5,19 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.2.6] — 2026-11-25
+
+### Added
+
+- **`tempAccess` module (on by default): OpenCode's temporary directory without asking.**
+  OpenCode tells the model to prefer `<tmpdir>/opencode` (`/tmp/opencode` on Linux) over
+  `/tmp`, "pre-created and approved for external access", but no rule approves it, so
+  every read or write there asked for `external_directory`. apex now allows those requests
+  through a `permission.evaluate` hook. It only turns `ask` into `allow`, only when every
+  requested path is inside that directory, and a deny you configure still wins, since
+  OpenCode evaluates configured denies first. It runs after the guard and before the
+  advisor. Turn it off with `"modules": { "tempAccess": false }`.
+
 ## [0.2.5] — 2026-11-24
 
 0.2.4 was never published to npm. Its changes are part of this release.

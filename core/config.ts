@@ -264,6 +264,8 @@ export const apexConfigSchema = z.object({
       guard: z.boolean().optional(),
       // Activado por defecto; en modo external puede abrir un popup de Chrome.
       browser: z.boolean().optional(),
+      // Activado por defecto: external_directory sin preguntar en <tmpdir>/opencode.
+      tempAccess: z.boolean().optional(),
     })
     .default(() => ({})),
 })
