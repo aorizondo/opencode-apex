@@ -35,7 +35,9 @@ Look for it before reaching for a tunnel:
 
 The tunnel client connects **out** to the provider. The provider gives you a public HTTPS URL that forwards to a local port. Point it at **the relay's port**, never at the OpenCode server.
 
-**OpenTunnel (first choice)**: by Anomaly, the makers of OpenCode. No account. TLS ends on your machine, so the relay server cannot read the traffic. Prebuilt for Linux and macOS.
+**OpenTunnel (first choice)**: by Anomaly, the makers of OpenCode. No account. TLS ends on your machine, so the relay server cannot read the traffic.
+
+**With apex you do not need the CLI.** `apex_tunnel({action:"open", port})` publishes a port. `apex_webhook` gives a verified webhook URL with no relay code. Both work on Linux, macOS and Windows, live in the apex daemon and accept a TTL (skill `apex-endpoints`). The CLI below is for machines without apex. It ships prebuilt for Linux and macOS.
 - Install: `curl -fsSL https://opentunnel.xyz/install | sh`, `brew install anomalyco/tap/opentunnel`, or `npm install -g opentunnel`.
 - Publish the relay:
   ```sh

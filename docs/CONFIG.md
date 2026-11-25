@@ -81,7 +81,7 @@ but are overridden by the local file.
 Each module has exactly one switch, under `modules`:
 
 ```jsonc
-"modules": { "redact": true, "events": true, "advisor": true, "guard": false, "browser": false, "tempAccess": true }
+"modules": { "redact": true, "events": true, "advisor": true, "guard": false, "browser": false, "tempAccess": true, "endpoints": true }
 ```
 
 | Module | Default when the key is omitted |
@@ -92,6 +92,7 @@ Each module has exactly one switch, under `modules`:
 | `guard` | **off** (it can block the agent if its rules are wrong, so you opt in) |
 | `browser` | **off** since 0.3.0 (deprecated: use OpenCode's [browse](https://opencode.ai/product/browse)) |
 | `tempAccess` | on |
+| `endpoints` | on (the daemon starts only when an `apex_webhook` / `apex_tunnel` / `apex_service` tool is used, see [ENDPOINTS.md](ENDPOINTS.md)) |
 
 There is no `<module>.enabled` key. A legacy `events.enabled` is ignored and logs a
 warning. So does `events.listener`: the HTTP listener was removed in 0.2.0, see

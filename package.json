@@ -1,7 +1,7 @@
 {
   "name": "opencode-apex",
-  "version": "0.3.0",
-  "description": "Modular plugin for OpenCode V2 (>= 2.1): secret redaction, RPC callbacks/webhooks/watchers that wake agents, tools.run, AI permission advisor, guard meta-permissions, temp-directory access, (deprecated) headless browser over CDP",
+  "version": "0.4.0",
+  "description": "Modular plugin for OpenCode V2 (>= 2.1): secret redaction, RPC callbacks/webhooks/watchers that wake agents, OpenTunnel endpoints + verified webhooks + supervised microservices (cross-platform daemon), tools.run, AI permission advisor, guard meta-permissions, temp-directory access",
   "license": "MIT",
   "author": "Antonio Orizondo Leyva",
   "repository": {
@@ -25,7 +25,10 @@
     "automation",
     "permissions",
     "cdp",
-    "browser"
+    "browser",
+    "opentunnel",
+    "tunnel",
+    "microservices"
   ],
   "engines": {
     "opencode": ">=2.1.0"
@@ -36,6 +39,8 @@
     "index.ts",
     "redact.ts",
     "events.ts",
+    "daemon",
+    "endpoints.ts",
     "advisor.ts",
     "guard.ts",
     "browser.ts",
@@ -50,6 +55,7 @@
   "dependencies": {
     "@opencode/plugin": "^2.1.1",
     "@opencode/plugin-browser": "^2.1.1",
+    "@opentunnel/client": "^0.7.0",
     "jsonc-parser": "^3.3.1",
     "ws": "^8.22.0",
     "zod": "^3.24.0"
@@ -59,7 +65,7 @@
     "bun-types": "^1.1.0"
   },
   "scripts": {
-    "test": "bun test/events.test.ts && bun test/guard.test.ts && bun test/process-context.test.ts && bun test/temp-access.test.ts",
+    "test": "bun test/events.test.ts && bun test/guard.test.ts && bun test/process-context.test.ts && bun test/temp-access.test.ts && bun test/endpoints.test.ts",
     "typecheck": "tsc --noEmit -p .",
     "check:install": "node scripts/check-install.mjs",
     "prepublishOnly": "npm test && npm run typecheck && npm run check:install"

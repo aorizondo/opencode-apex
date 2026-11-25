@@ -7,6 +7,7 @@
       "dependencies": {
         "@opencode/plugin": "^2.1.1",
         "@opencode/plugin-browser": "^2.1.1",
+        "@opentunnel/client": "^0.7.0",
         "jsonc-parser": "^3.3.1",
         "ws": "^8.22.0",
         "zod": "^3.24.0",
@@ -157,6 +158,10 @@
     "@opentelemetry/sdk-trace-node": ["@opentelemetry/sdk-trace-node@2.8.0", "", { "dependencies": { "@opentelemetry/context-async-hooks": "2.8.0", "@opentelemetry/core": "2.8.0", "@opentelemetry/sdk-trace-base": "2.8.0" }, "peerDependencies": { "@opentelemetry/api": ">=1.0.0 <1.10.0" } }, "sha512-nZt9OGufioAc3AfoLTqA9bsAeaMJAictYDdI2VcNQ+PmT+3rfKjAZDZvgPfd8VPX0O5Bw1hdQF6kDK8VSpZiWg=="],
 
     "@opentelemetry/semantic-conventions": ["@opentelemetry/semantic-conventions@1.43.0", "", {}, "sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg=="],
+
+    "@opentunnel/client": ["@opentunnel/client@0.7.0", "", { "dependencies": { "@opentunnel/protocol": "0.7.0" }, "peerDependencies": { "effect": "^4.0.0", "undici": ">=7.0.0" }, "optionalPeers": ["undici"] }, "sha512-JAbqkXbmawcZAMjFYHcANtcYHleV7JvdoZVWj4kc2ne/TNGoID85x5Qe/+4e04yOaMWRETjAWqYlYDycSst4hw=="],
+
+    "@opentunnel/protocol": ["@opentunnel/protocol@0.7.0", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-U/ohurqlQQO521DpKZkPMn8pgKs8ekE/8xz2uq7yUY8e1kWGWt2052COx/P52s08qFs9QJMEV9KO5VW5AFrJvg=="],
 
     "@pkgjs/parseargs": ["@pkgjs/parseargs@0.11.0", "", {}, "sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg=="],
 

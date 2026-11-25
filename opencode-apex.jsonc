@@ -40,7 +40,9 @@
     // Deprecated: use OpenCode's browse for your browser (docs/BROWSER.md)
     "browser": false,
     // external_directory without asking in <tmpdir>/opencode (OpenCode's temp dir)
-    "tempAccess": true
+    "tempAccess": true,
+    // Túneles OpenTunnel, webhooks verificados y microservicios (daemon de apex, solo al usarlos)
+    "endpoints": true
   },
 
 

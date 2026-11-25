@@ -5,6 +5,43 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-25
+
+### Added
+
+- **`endpoints` module (on by default): public URLs, verified webhooks and supervised
+  microservices.** Four tools:
+  - `apex_webhook` creates a webhook URL that verifies GitHub, Stripe or Slack signatures,
+    a generic HMAC-SHA256 or a token, then calls `events.ingest` on loopback. Senders never
+    get the server password, and the agent writes no relay code.
+  - `apex_tunnel` publishes a local port on an OpenTunnel HTTPS URL.
+  - `apex_service` runs a microservice the agent wrote. It restarts with backoff, keeps
+    logs, can have a public URL, and wakes agents through a local ingest with its own token.
+  - `apex_daemon` reports status, turns autostart on or off, and stops the daemon.
+
+  Webhooks, tunnels and services can have a TTL, so they are temporary or permanent.
+- **apex daemon.** One process per user keeps these alive, outside the plugin that OpenCode
+  unloads after 60 minutes.
+  - It runs on OpenCode's own executable in bun mode (`BUN_BE_BUN=1`), so it works on
+    Linux with any init system, on macOS and on Windows, without systemd, launchd or the
+    opentunnel CLI.
+  - A lockfile ensures there is only one.
+  - It uses `@opentunnel/client` on the device's `default` tunnel, alongside OpenCode
+    remote access, with its own routes.
+  - It applies TTLs even with OpenCode closed.
+  - A newer daemon adopts the services of the one it replaces instead of restarting them.
+  - It exits after 10 minutes with nothing to keep.
+- **Optional autostart** after a reboot: a crontab `@reboot` line on Linux, macOS and BSD,
+  a logon task on Windows. Off by default.
+- **New packaged skill `apex-endpoints`.** `apex-callbacks` now points to `apex_webhook`
+  and `apex_service` before hand-written relays and OS units. See
+  [docs/ENDPOINTS.md](docs/ENDPOINTS.md).
+
+### Dependencies
+
+- `@opentunnel/client` ^0.7.0. Its peer `effect` is the one `@opencode/plugin` already
+  brings.
+
 ## [0.3.0] — 2026-11-25
 
 ### Deprecated
