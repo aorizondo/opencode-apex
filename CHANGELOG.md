@@ -5,6 +5,10 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.2.5] — 2026-11-24
+
+0.2.4 was never published to npm. Its changes are part of this release.
+
 ### Added
 
 - **`apex_callback_endpoint` finds OpenCode's remote access on its own.** When the
