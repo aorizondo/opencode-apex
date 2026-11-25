@@ -253,7 +253,7 @@ await fetch(process.env.APEX_INGEST_URL, { method: "POST", headers: { authorizat
   const gone = await daemon!.request<{ webhooks: unknown[] }>("GET", "/v1/state")
   check("borrar webhook", gone.webhooks.length === 0)
 } catch (error) {
-  check(`sin excepciones: ${String((error as Error).stack ?? error)}`, false)
+  check(`sin excepciones: ${String((error as Error).message)} ${String((error as Error).stack ?? error)}`, false)
 } finally {
   if (servicePid) {
     try {

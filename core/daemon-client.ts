@@ -80,7 +80,7 @@ async function call<T>(info: DaemonInfo, method: string, path: string, body?: un
   } catch {
     data = { error: text }
   }
-  if (!response.ok) throw new DaemonError((data as { error?: string }).error ?? `daemon ${response.status}`, response.status)
+  if (!response.ok) throw new DaemonError((data as { error?: string }).error || `daemon HTTP ${response.status} on ${method} ${path}`, response.status)
   return data as T
 }
 

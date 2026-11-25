@@ -33,7 +33,7 @@ import {
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
 import { uptime } from "node:os"
 import { join } from "node:path"
-import { rpcUrl } from "../core/server-endpoint.js"
+import { rpcUrl, tunnelDirectory } from "../core/server-endpoint.js"
 import {
   bootStamp,
   daemonPaths,
@@ -197,14 +197,18 @@ function routeTable(): Record<string, string | { target: string; proxyProtocol: 
   return routes
 }
 
+/**
+ * Hostname del túnel del dispositivo, leído del disco (`tunnel.json`, lo escribe el SDK cuando
+ * el certificado está listo). No pasa por el SDK: mientras `connect` aprovisiona, sus
+ * llamadas esperan y una petición de control se quedaría colgada.
+ */
 async function knownHostname(): Promise<string | null> {
   if (tunnel.hostname) return tunnel.hostname
   try {
-    tunnel.client ??= await loadClient()
-    const identity = await tunnel.client.tunnel.get()
-    tunnel.hostname = identity?.hostname ?? null
-  } catch (error) {
-    tunnel.lastError = String((error as Error).message ?? error)
+    const stored = JSON.parse(readFileSync(join(tunnelDirectory(), "default", "tunnel.json"), "utf8")) as { hostname?: unknown }
+    if (typeof stored.hostname === "string" && stored.hostname.length > 0) tunnel.hostname = stored.hostname
+  } catch {
+    // sin túnel todavía
   }
   return tunnel.hostname
 }
@@ -237,9 +241,8 @@ async function applyRoutes(): Promise<void> {
       return
     }
     tunnel.client ??= await loadClient()
-    const known = await tunnel.client.tunnel.get()
     // Sin identidad, connect crea el túnel del dispositivo (certificado: ~1 min).
-    tunnel.state = known ? "connecting" : "provisioning"
+    tunnel.state = (await knownHostname()) ? "connecting" : "provisioning"
     const connection = await tunnel.client.tunnel.connect({
       routes,
       onEvent: (event) => {
