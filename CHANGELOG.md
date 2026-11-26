@@ -5,6 +5,14 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-11-26
+
+### Fixed
+
+- **Redaction froze OpenCode on long sessions** (backport of 0.5.1). The `k8s-secret-data-value`
+  pattern had an unbounded, ambiguous lookbehind: ~80 s of CPU per pass over a ~500 KB context
+  in Bun/JSC. Now bounded (~80 ms on the same text).
+
 ## [0.4.0] — 2026-11-25
 
 ### Added
