@@ -5,6 +5,18 @@ All notable changes to `opencode-apex`. Format based on
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-11-26
+
+### Fixed
+
+- **Redaction froze OpenCode on long sessions.** The `k8s-secret-data-value` pattern (from
+  warden) had an unbounded, ambiguous lookbehind (`\s+` crossing lines, unlimited repetition):
+  one pass over a ~500 KB context took ~80 s of CPU in Bun/JSC. Since the `context` hook
+  re-redacts the whole history on every request, the server stopped answering `/health`, the
+  desktop app killed it, and the busy session resumed into the same freeze on every restart.
+  The lookbehind is now bounded (`[ \t]` indentation, up to 16 keys between `data:` and the
+  value, lines up to 512 chars): ~80 ms on the same text. It also matches keys with `.` and `-`.
+
 ## [0.5.0] — 2026-11-25
 
 ### Removed

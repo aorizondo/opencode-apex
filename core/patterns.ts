@@ -296,7 +296,10 @@ const BUNDLES: Record<string, PatternDefinition[]> = {
 
   // ------------------------------------------------------------ Kubernetes
   kubernetes: [
-    { name: "k8s-secret-data-value", regex: /(?<=data:\s*\n(?:\s+\w+:\s*[^\n]*\n)*\s+\w+:\s*)[A-Za-z0-9+/=]{20,}/g, confidence: "medium", source: "warden" },
+    // Lookbehind acotado y sin ambigüedad (2026-11-26): el original de warden, con `\s+` que cruza
+    // líneas y repetición sin límite, costaba ~80 s sobre un contexto de 500 KB (JSC) y congelaba
+    // OpenCode. Ahora: sangría [ \t], hasta 16 claves entre `data:` y el valor, líneas ≤ 512.
+    { name: "k8s-secret-data-value", regex: /(?<=\bdata:[ \t]*(?:\r?\n[ \t]{1,16}[\w.-]{1,253}:[^\n]{0,512}){0,16}\r?\n[ \t]{1,16}[\w.-]{1,253}:[ \t]{0,8})[A-Za-z0-9+/=]{20,}/g, confidence: "medium", source: "warden" },
     { name: "kubeconfig-token", regex: /(?<=token:\s*)[A-Za-z0-9_.-]{20,}/g, confidence: "medium", source: "warden" },
     { name: "kubeconfig-client-key-data", regex: /(?<=client-key-data:\s*)[A-Za-z0-9+/=\n]{50,}/g, confidence: "high", source: "warden" },
     { name: "kubeconfig-client-cert-data", regex: /(?<=client-certificate-data:\s*)[A-Za-z0-9+/=\n]{50,}/g, confidence: "high", source: "warden" },
